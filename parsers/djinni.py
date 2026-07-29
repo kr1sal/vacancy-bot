@@ -7,6 +7,8 @@ from xml.etree import ElementTree as ET
 import httpx
 from bs4 import BeautifulSoup
 
+from parsers.filter import is_relevant
+
 logger = logging.getLogger(__name__)
 
 DJINNI_RSS_URLS = [
@@ -57,18 +59,12 @@ async def fetch_vacancies() -> list[Vacancy]:
                 v = _parse_item(item)
                 if not v or v.id in seen:
                     continue
-                if not _matches_flutter(v):
+                if not is_relevant(v.title, v.description):
                     continue
                 seen.add(v.id)
                 result.append(v)
 
     return result
-
-
-def _matches_flutter(v: "Vacancy") -> bool:
-    haystack = f"{v.title} {v.description}".lower()
-    keywords = ("flutter", "dart ", " dart", "мобильн", "mobile developer", "mobile-разработчик")
-    return any(k in haystack for k in keywords)
 
 
 def _parse_item(item: ET.Element) -> Vacancy | None:

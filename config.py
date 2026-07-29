@@ -30,10 +30,20 @@ _channels_raw = os.environ.get(
 ).strip()
 TG_CHANNELS = [c.strip().lstrip("@") for c in _channels_raw.split(",") if c.strip()]
 
-TG_KEYWORDS = [
+# Единый список ключевых слов для фильтрации во всех источниках
+# (TG, Djinni, Gmail). HH и Habr фильтруются на стороне сайта по запросу.
+VACANCY_KEYWORDS = [
     k.strip().lower() for k in os.environ.get(
-        "TG_KEYWORDS", "flutter,dart,mobile developer,mobile-разработчик,мобильный разработчик"
+        "VACANCY_KEYWORDS",
+        # `мобильн` покрывает мобильный/мобильного/мобильному/мобильных...
+        "flutter,dart,mobile developer,mobile-разработчик,мобильн",
     ).split(",") if k.strip()
+]
+
+# Стоп-слова: если хоть одно есть в тексте — вакансия отбрасывается.
+# Полезно чтобы фильтровать «Senior only» / «Lead only» / «React Native only».
+VACANCY_STOPWORDS = [
+    s.strip().lower() for s in os.environ.get("VACANCY_STOPWORDS", "").split(",") if s.strip()
 ]
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "vacancies.db")

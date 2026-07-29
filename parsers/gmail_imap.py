@@ -21,6 +21,7 @@ from email.header import decode_header
 from bs4 import BeautifulSoup
 
 from config import GMAIL_USER, GMAIL_APP_PASSWORD, GMAIL_LOOKBACK_DAYS
+from parsers.filter import is_relevant
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +47,6 @@ SENDERS = {
     "linkedin.com": ("LinkedIn", r"https?://[^\s\"<>]*linkedin\.com/(?:jobs/view|comm/jobs)/\d+"),
     "getmatch.ru": ("getmatch", r"https?://[^\s\"<>]*getmatch\.ru/vacancies/\d+"),
 }
-
-_KEYWORDS = ("flutter", "dart", "mobile developer", "mobile-разработчик", "мобильн")
-
 
 def is_enabled() -> bool:
     return bool(GMAIL_USER and GMAIL_APP_PASSWORD)
@@ -118,9 +116,7 @@ def _parse_message(msg: email.message.Message, source_name: str, url_pattern: st
     if not urls:
         return []
 
-    # Извлекаем title из subject или первой строки тела (fallback)
-    combined = body_text.lower() + " " + subject.lower()
-    if not any(k in combined for k in _KEYWORDS):
+    if not is_relevant(subject, body_text):
         return []
 
     result = []

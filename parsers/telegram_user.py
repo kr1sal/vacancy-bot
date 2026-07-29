@@ -14,7 +14,8 @@ from dataclasses import dataclass
 import httpx
 from bs4 import BeautifulSoup
 
-from config import TG_CHANNELS, TG_KEYWORDS
+from config import TG_CHANNELS
+from parsers.filter import is_relevant
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ async def fetch_vacancies() -> list[Vacancy]:
                 v = _parse_post(channel, post)
                 if not v:
                     continue
-                if not _matches_keywords(v.description):
+                if not is_relevant(v.title, v.description):
                     continue
                 result.append(v)
 
@@ -126,11 +127,6 @@ def _extract_external_url(text_el) -> str | None:
         if href.startswith("http") and "t.me/" not in href:
             return href
     return None
-
-
-def _matches_keywords(text: str) -> bool:
-    low = text.lower()
-    return any(kw in low for kw in TG_KEYWORDS)
 
 
 def _extract_company(text: str) -> str | None:
