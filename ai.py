@@ -9,7 +9,9 @@ from config import OPENROUTER_API_KEY, CV_PATH, COVER_LETTER_EXAMPLE_PATH
 logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-SUMMARY_MODEL = "google/gemini-2.0-flash-exp:free"
+# Дешёвая модель для структурированной суммаризации (~$0.10/1M in)
+SUMMARY_MODEL = "google/gemini-2.5-flash-lite"
+# Сильная модель для сопроводительных писем
 LETTER_MODEL = "anthropic/claude-sonnet-4.5"
 
 _HEADERS = {
