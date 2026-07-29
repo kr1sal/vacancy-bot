@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Chert Vacancy Bot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --card: var(--tg-theme-secondary-bg-color, #f4f4f5);
+    --text: var(--tg-theme-text-color, #1a1a1e);
+    --muted: var(--tg-theme-hint-color, #8a8a92);
+    --link: var(--tg-theme-link-color, #7c40c0);
+    --btn: var(--tg-theme-button-color, #7c40c0);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --border: rgba(128, 128, 140, 0.18);
+    --accent: #7c40c0;
+    --star: #f5b301;
+    --success: #1a8f8f;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ─────────────────────────────────────────── */
+  .app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+  .header {
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .title { font-size: 15px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.1px; }
+  .title span { color: var(--muted); font-weight: 500; }
+
+  .tabs {
+    display: flex; gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px; font-weight: 500;
+    border: none; cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .tab .badge {
+    margin-left: 5px;
+    font-size: 11px; font-weight: 600;
+    color: var(--muted);
+  }
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .tab.active .badge { color: rgba(255,255,255,0.8); }
+
+  .content { flex: 1; overflow-y: auto; padding: 8px 12px 24px; }
+
+  /* ── List ───────────────────────────────────────────── */
+  .empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 60px 20px;
+    font-size: 14px;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+    cursor: pointer;
+    transition: transform 0.06s;
+  }
+  .card:active { transform: scale(0.99); }
+  .card.viewed .card-title { color: var(--muted); font-weight: 500; }
+
+  .card-title {
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.3;
+    letter-spacing: -0.1px;
+  }
+  .card-meta {
+    font-size: 12.5px;
+    color: var(--muted);
+    display: flex; gap: 6px; flex-wrap: wrap;
+    align-items: center;
+  }
+  .card-meta .dot { opacity: 0.5; }
+  .card-salary { color: var(--success); font-weight: 500; }
+
+  .card-actions { display: flex; align-items: flex-start; gap: 6px; }
+  .star {
+    background: none; border: none; cursor: pointer;
+    font-size: 20px; padding: 2px 4px;
+    color: var(--muted);
+    opacity: 0.6;
+    line-height: 1;
+  }
+  .star.on { color: var(--star); opacity: 1; }
+
+  .card-badges { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .badge-tag {
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(124, 64, 192, 0.12);
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .badge-tag.src-habr { background: rgba(26, 143, 143, 0.12); color: var(--success); }
+  .badge-tag.src-djinni { background: rgba(0, 122, 204, 0.15); color: #0075c4; }
+  .badge-tag.src-tg { background: rgba(38, 129, 200, 0.15); color: #1a6ba8; }
+  .badge-tag.src-gmail { background: rgba(217, 48, 37, 0.15); color: #c62b1f; }
+  .badge-tag.letter { background: rgba(245, 179, 1, 0.15); color: #b78400; }
+  .badge-tag.applied { background: rgba(26, 143, 143, 0.18); color: var(--success); }
+
+  /* ── Details view ───────────────────────────────────── */
+  .details { display: none; }
+  .details.active { display: flex; flex-direction: column; height: 100%; }
+
+  .details-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+  }
+  .back-btn {
+    background: none; border: none;
+    color: var(--link); font-size: 15px; font-weight: 500;
+    cursor: pointer; padding: 4px 6px; margin-left: -6px;
+  }
+
+  .details-body { padding: 14px 16px 100px; overflow-y: auto; flex: 1; }
+  .d-title { font-size: 20px; font-weight: 700; line-height: 1.2; letter-spacing: -0.3px; margin-bottom: 4px; }
+  .d-company { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+  .d-salary { display: inline-block; background: rgba(26, 143, 143, 0.12); color: var(--success); padding: 3px 10px; border-radius: 4px; font-weight: 600; font-size: 13px; margin-bottom: 16px; }
+
+  .summary-grid { display: grid; gap: 8px; margin-bottom: 20px; }
+  .summary-row {
+    display: grid; grid-template-columns: 90px 1fr; gap: 10px;
+    font-size: 13.5px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row .label { color: var(--muted); font-weight: 500; }
+  .summary-row .value { color: var(--text); }
+
+  .section-title {
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted);
+    margin: 20px 0 8px;
+  }
+  .description-text {
+    font-size: 13.5px; line-height: 1.55;
+    color: var(--text);
+    white-space: pre-wrap;
+    background: var(--card);
+    padding: 12px 14px;
+    border-radius: 10px;
+    max-height: 300px; overflow-y: auto;
+  }
+
+  .letter-box {
+    background: var(--card);
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: 14px; line-height: 1.55;
+    white-space: pre-wrap;
+    border-left: 3px solid var(--accent);
+  }
+
+  .revise-form {
+    margin-top: 12px;
+    background: var(--card);
+    border-radius: 10px;
+    padding: 12px;
+    display: none;
+  }
+  .revise-form.open { display: block; }
+  .revise-form label {
+    display: block;
+    font-size: 12px; font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 6px;
+  }
+  .revise-form textarea {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.45;
+    outline: none;
+  }
+  .revise-form textarea:focus { border-color: var(--accent); }
+  .revise-form-actions {
+    display: flex; gap: 8px; margin-top: 10px;
+  }
+  .revise-form-actions .btn {
+    padding: 9px 14px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+  .revise-hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+
+  .actions {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 12px 14px calc(env(safe-area-inset-bottom, 0) + 12px);
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+  }
+  .btn {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px; font-weight: 600;
+    border: none; cursor: pointer;
+    background: var(--btn); color: var(--btn-text);
+    transition: opacity 0.15s;
+  }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn.secondary { background: var(--card); color: var(--text); }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); color: white;
+    padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transition: opacity 0.25s;
+    pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- LIST VIEW -->
+  <div id="list-view">
+    <div class="header">
+      <div class="title">Chert Vacancy Bot <span id="total-hint"></span></div>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-filter="new">🆕 Новые <span class="badge" id="c-new">0</span></button>
+        <button class="tab" data-filter="viewed">👁 Просмотренные <span class="badge" id="c-viewed">0</span></button>
+        <button class="tab" data-filter="starred">⭐ Отмеченные <span class="badge" id="c-starred">0</span></button>
+        <button class="tab" data-filter="applied">📤 Отклики <span class="badge" id="c-applied">0</span></button>
+        <button class="tab" data-filter="all">📋 Все <span class="badge" id="c-all">0</span></button>
+      </div>
+    </div>
+    <div class="content" id="list-content">
+      <div class="empty">Загрузка…</div>
+    </div>
+  </div>
+
+  <!-- DETAILS VIEW -->
+  <div class="details" id="details-view">
+    <div class="details-header">
+      <button class="back-btn" id="back-btn">← Назад</button>
+    </div>
+    <div class="details-body" id="details-body"></div>
+    <div class="actions" id="details-actions"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const state = {
+  filter: 'new',
+  vacancies: [],
+  currentId: null,
+};
+
+function initData() {
+  return (tg && tg.initData) || '';
+}
+
+async function api(path, opts = {}) {
+  const headers = { 'X-Telegram-Init-Data': initData(), ...(opts.headers || {}) };
+  if (opts.body && typeof opts.body === 'object') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const resp = await fetch(path, { ...opts, headers });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+function toast(text, duration = 2200) {
+  const el = document.getElementById('toast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function loadCounts() {
+  try {
+    const c = await api('/api/counts');
+    document.getElementById('c-new').textContent = c.new;
+    document.getElementById('c-viewed').textContent = c.viewed;
+    document.getElementById('c-starred').textContent = c.starred;
+    document.getElementById('c-applied').textContent = c.applied || 0;
+    document.getElementById('c-all').textContent = c.all;
+    document.getElementById('total-hint').textContent = c.all ? `· ${c.all}` : '';
+  } catch (e) { console.error(e); }
+}
+
+async function loadList() {
+  const content = document.getElementById('list-content');
+  content.innerHTML = '<div class="empty">Загрузка…</div>';
+  try {
+    const vacancies = await api(`/api/vacancies?filter=${state.filter}`);
+    state.vacancies = vacancies;
+    renderList(vacancies);
+  } catch (e) {
+    content.innerHTML = `<div class="empty">Ошибка загрузки: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderList(vacancies) {
+  const content = document.getElementById('list-content');
+  if (!vacancies.length) {
+    const msg = {
+      new: 'Нет новых вакансий',
+      viewed: 'Пока ничего не просмотрено',
+      starred: 'Нет отмеченных',
+      applied: 'Ещё не откликался ни на одну',
+      all: 'Список пуст',
+    }[state.filter];
+    content.innerHTML = `<div class="empty">${msg}</div>`;
+    return;
+  }
+  content.innerHTML = vacancies.map(v => cardHtml(v)).join('');
+  content.querySelectorAll('.card').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('.star')) return;
+      openDetails(el.dataset.id);
+    });
+  });
+  content.querySelectorAll('.star').forEach(el => {
+    el.addEventListener('click', async e => {
+      e.stopPropagation();
+      await toggleStar(el.dataset.id, el);
+    });
+  });
+}
+
+const SOURCE_LABELS = { hh: 'HH', habr: 'HABR', djinni: 'DJINNI', tg: 'TG', gmail: 'GMAIL' };
+
+function cardHtml(v) {
+  const salary = v.salary && v.salary !== 'не указана' && v.salary !== 'не указан'
+    ? `<span class="card-salary">${escapeHtml(v.salary)}</span>`
+    : '';
+  const srcLabel = SOURCE_LABELS[v.source] || (v.source || '?').toUpperCase();
+  const srcClass = `src-${v.source || 'unknown'}`;
+  const letterBadge = v.has_letter ? '<span class="badge-tag letter">✉ Письмо</span>' : '';
+  const appliedBadge = v.applied ? '<span class="badge-tag applied">📤 Отклик</span>' : '';
+  return `
+    <div class="card ${v.viewed ? 'viewed' : ''}" data-id="${escapeHtml(v.id)}">
+      <div>
+        <div class="card-title">${escapeHtml(v.title)}</div>
+        <div class="card-meta">
+          <span>${escapeHtml(v.company)}</span>
+          ${salary ? '<span class="dot">·</span>' + salary : ''}
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="star ${v.starred ? 'on' : ''}" data-id="${escapeHtml(v.id)}">${v.starred ? '★' : '☆'}</button>
+      </div>
+      <div class="card-badges">
+        <span class="badge-tag ${srcClass}">${srcLabel}</span>
+        ${appliedBadge}
+        ${letterBadge}
+      </div>
+    </div>
+  `;
+}
+
+async function toggleStar(vid, btn) {
+  try {
+    const { starred } = await api(`/api/vacancies/${vid}/star`, { method: 'POST' });
+    btn.classList.toggle('on', starred);
+    btn.textContent = starred ? '★' : '☆';
+    const v = state.vacancies.find(x => x.id === vid);
+    if (v) v.starred = starred;
+    loadCounts();
+  } catch (e) { toast('Не удалось: ' + e.message); }
+}
+
+async function openDetails(vid) {
+  state.currentId = vid;
+  document.getElementById('list-view').style.display = 'none';
+  document.getElementById('details-view').classList.add('active');
+  const body = document.getElementById('details-body');
+  const actions = document.getElementById('details-actions');
+  body.innerHTML = '<div class="empty">Загрузка…</div>';
+  actions.innerHTML = '';
+  try {
+    await api(`/api/vacancies/${vid}/view`, { method: 'POST' });
+    const v = await api(`/api/vacancies/${vid}`);
+    renderDetails(v);
+    loadCounts();
+    // update local card state
+    const local = state.vacancies.find(x => x.id === vid);
+    if (local) local.viewed = true;
+  } catch (e) {
+    body.innerHTML = `<div class="empty">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderDetails(v) {
+  const body = document.getElementById('details-body');
+  const actions = document.getElementById('details-actions');
+  const s = v.summary || {};
+
+  const salaryHtml = v.salary && v.salary !== 'не указана' && v.salary !== 'не указан'
+    ? `<div class="d-salary">${escapeHtml(v.salary)}</div>` : '';
+
+  const summaryHtml = v.summary ? `
+    <div class="summary-grid">
+      <div class="summary-row"><div class="label">Стек</div><div class="value">${escapeHtml(s.stack || '—')}</div></div>
+      <div class="summary-row"><div class="label">Опыт</div><div class="value">${escapeHtml(s.experience || '—')}</div></div>
+      <div class="summary-row"><div class="label">Условия</div><div class="value">${escapeHtml(s.conditions || '—')}</div></div>
+      <div class="summary-row"><div class="label">Компания</div><div class="value">${escapeHtml(s.company_about || '—')}</div></div>
+    </div>` : '';
+
+  const descHtml = v.description ? `
+    <div class="section-title">Описание</div>
+    <div class="description-text">${escapeHtml(v.description)}</div>` : '';
+
+  const letterHtml = v.letter ? `
+    <div class="section-title">Сопроводительное письмо</div>
+    <div class="letter-box" id="letter-box">${escapeHtml(v.letter)}</div>
+    <div class="revise-form" id="revise-form">
+      <label for="revise-input">Правки для перегенерации</label>
+      <textarea id="revise-input" placeholder="Что изменить? Например: убери упоминание DevOps, добавь про yandex_mapkit, сделай короче на один абзац"></textarea>
+      <div class="revise-hint">Модель перепишет письмо с учётом правок. Кешированная версия будет заменена.</div>
+      <div class="revise-form-actions">
+        <button class="btn secondary" id="revise-cancel">Отмена</button>
+        <button class="btn" id="revise-submit">Перегенерировать</button>
+      </div>
+    </div>` : `
+    <div class="section-title">Сопроводительное письмо</div>
+    <div id="letter-placeholder" class="empty" style="padding:20px 0;text-align:left;">Пока не сгенерировано</div>`;
+
+  body.innerHTML = `
+    <div class="d-title">${escapeHtml(v.title)}</div>
+    <div class="d-company">${escapeHtml(v.company)}</div>
+    ${salaryHtml}
+    ${summaryHtml}
+    ${descHtml}
+    ${letterHtml}
+  `;
+
+  const appliedBtnLabel = v.applied ? '✓ Отклик отправлен' : '📤 Откликнулся';
+  actions.innerHTML = `
+    <button class="btn secondary" id="open-btn">Открыть</button>
+    <button class="btn ${v.applied ? 'secondary' : ''}" id="applied-btn">${appliedBtnLabel}</button>
+    ${v.letter
+      ? '<button class="btn secondary" id="revise-btn">↻ Правки</button><button class="btn" id="copy-btn">Скопировать</button>'
+      : '<button class="btn" id="gen-btn">Письмо</button>'}
+  `;
+
+  document.getElementById('open-btn').onclick = () => {
+    if (tg && tg.openLink) tg.openLink(v.url);
+    else window.open(v.url, '_blank');
+  };
+
+  document.getElementById('applied-btn').onclick = async () => {
+    try {
+      const { applied } = await api(`/api/vacancies/${v.id}/applied`, { method: 'POST' });
+      v.applied = applied;
+      renderDetails(v);
+      loadCounts();
+      toast(applied ? 'Отмечено как откликнулся' : 'Отметка снята');
+    } catch (e) { toast('Ошибка: ' + e.message); }
+  };
+
+  const genBtn = document.getElementById('gen-btn');
+  if (genBtn) {
+    genBtn.onclick = async () => {
+      genBtn.disabled = true;
+      genBtn.innerHTML = '<span class="spinner"></span>Генерирую…';
+      try {
+        const { letter } = await api(`/api/vacancies/${v.id}/letter`, { method: 'POST' });
+        v.letter = letter;
+        renderDetails(v);
+        toast('Готово');
+      } catch (e) {
+        genBtn.disabled = false;
+        genBtn.textContent = 'Сгенерировать письмо';
+        toast('Ошибка: ' + e.message);
+      }
+    };
+  }
+
+  const copyBtn = document.getElementById('copy-btn');
+  if (copyBtn) {
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(v.letter);
+        toast('Скопировано');
+      } catch {
+        toast('Не удалось скопировать');
+      }
+    };
+  }
+
+  const reviseBtn = document.getElementById('revise-btn');
+  const reviseForm = document.getElementById('revise-form');
+  const reviseInput = document.getElementById('revise-input');
+  const reviseCancel = document.getElementById('revise-cancel');
+  const reviseSubmit = document.getElementById('revise-submit');
+
+  if (reviseBtn && reviseForm) {
+    reviseBtn.onclick = () => {
+      reviseForm.classList.add('open');
+      reviseInput.focus();
+      reviseForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    reviseCancel.onclick = () => {
+      reviseForm.classList.remove('open');
+      reviseInput.value = '';
+    };
+    reviseSubmit.onclick = async () => {
+      const feedback = reviseInput.value.trim();
+      if (!feedback) { toast('Опиши, что изменить'); return; }
+      reviseSubmit.disabled = true;
+      reviseCancel.disabled = true;
+      reviseSubmit.innerHTML = '<span class="spinner"></span>Перегенерирую…';
+      try {
+        const { letter } = await api(`/api/vacancies/${v.id}/letter`, {
+          method: 'POST',
+          body: { feedback },
+        });
+        v.letter = letter;
+        renderDetails(v);
+        toast('Готово');
+      } catch (e) {
+        reviseSubmit.disabled = false;
+        reviseCancel.disabled = false;
+        reviseSubmit.textContent = 'Перегенерировать';
+        toast('Ошибка: ' + e.message);
+      }
+    };
+  }
+}
+
+function closeDetails() {
+  document.getElementById('details-view').classList.remove('active');
+  document.getElementById('list-view').style.display = '';
+  state.currentId = null;
+  loadList();
+}
+
+document.getElementById('back-btn').onclick = closeDetails;
+
+document.getElementById('tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  state.filter = btn.dataset.filter;
+  loadList();
+});
+
+// Telegram back button integration
+if (tg && tg.BackButton) {
+  tg.BackButton.onClick(() => {
+    if (state.currentId) closeDetails();
+    else tg.close();
+  });
+  const updateBackBtn = () => {
+    if (state.currentId) tg.BackButton.show();
+    else tg.BackButton.hide();
+  };
+  const origOpen = openDetails;
+  openDetails = async function(vid) { await origOpen(vid); updateBackBtn(); };
+  const origClose = closeDetails;
+  closeDetails = function() { origClose(); updateBackBtn(); };
+}
+
+loadCounts();
+loadList();
+setInterval(loadCounts, 30000);
+</script>
+</body>
+</html>

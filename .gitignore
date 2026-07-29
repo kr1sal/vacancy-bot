@@ -1,0 +1,17 @@
+.env
+*.db
+*.db-shm
+*.db-wal
+*.session
+tg_user.session*
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+.idea/
+.vscode/
