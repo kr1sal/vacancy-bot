@@ -28,6 +28,24 @@ _HEADERS = {
     "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
 }
 
+# URL, которые "выглядят как вакансия". Приоритет в _extract_external_url.
+_JOB_URL_PATTERNS = [
+    re.compile(r"hh\.ru/vacancy/", re.I),
+    re.compile(r"career\.habr\.com/vacancies/", re.I),
+    re.compile(r"djinni\.co/(?:jobs|q)/", re.I),
+    re.compile(r"linkedin\.com/(?:jobs/view|comm/jobs|jobs/collections)/", re.I),
+    re.compile(r"indeed\.com/(?:viewjob|rc/clk|jobs)", re.I),
+    re.compile(r"getmatch\.ru/vacancies/", re.I),
+    re.compile(r"geekjob\.ru/vacancy/", re.I),
+    re.compile(r"gigsremote\.com/", re.I),
+    re.compile(r"remoteok\.com/", re.I),
+    re.compile(r"weworkremotely\.com/", re.I),
+    re.compile(r"(?:forms\.gle|forms\.yandex|docs\.google\.com/forms|form\.typeform)", re.I),
+    re.compile(r"(?:^|/)apply(?:/|\.)", re.I),
+    re.compile(r"lever\.co/|greenhouse\.io/|workable\.com/|smartrecruiters\.com/", re.I),
+    re.compile(r"joberty\.rs/|poslovi\.infostud\.com/", re.I),
+]
+
 
 @dataclass
 class Vacancy:
@@ -121,11 +139,19 @@ def _pick_title(text: str) -> str:
 
 
 def _extract_external_url(text_el) -> str | None:
-    """Ищем внешнюю ссылку (HH, Habr, компания и т.д.), не t.me."""
-    for a in text_el.find_all("a", href=True):
-        href = a["href"]
-        if href.startswith("http") and "t.me/" not in href:
-            return href
+    """Ищем ссылку, которая похожа на вакансию.
+
+    Приоритет: URL, матчащий один из _JOB_URL_PATTERNS (HH, Djinni, LinkedIn,
+    формы отклика, ATS-платформы и т.д.). Иначе — None, вызывающий код
+    подставит ссылку на само TG-сообщение.
+    """
+    urls = [
+        a["href"] for a in text_el.find_all("a", href=True)
+        if a.get("href", "").startswith("http") and "t.me/" not in a["href"]
+    ]
+    for url in urls:
+        if any(p.search(url) for p in _JOB_URL_PATTERNS):
+            return url
     return None
 
 

@@ -43,9 +43,10 @@ class Vacancy:
 # Чтобы включить LinkedIn/Indeed — подпишись на их Job Alerts (Weekly/Daily)
 # по запросу "Flutter" (+ Serbia / remote), письма приходят автоматически.
 SENDERS = {
-    "hh.ru": ("HH.ru", r"https?://[^\s\"<>]*hh\.ru/vacancy/\d+"),
-    "career.habr.com": ("Habr Career", r"https?://[^\s\"<>]*career\.habr\.com/vacancies/\d+"),
-    "habr.com": ("Habr Career", r"https?://[^\s\"<>]*career\.habr\.com/vacancies/\d+"),
+    # HH.ru и Habr Career намеренно НЕ включены — они парсятся напрямую
+    # через RSS/HTML (parsers/hh.py, parsers/habr.py). Их email-подборки
+    # содержат «вакансии по подписке» — 20 нерелевантных позиций одной
+    # компании ради одного совпадения по ключевому слову.
     "djinni.co": ("Djinni", r"https?://[^\s\"<>]*djinni\.co/jobs/\d+"),
     "linkedin.com": ("LinkedIn",
                      r"https?://[^\s\"<>]*linkedin\.com/(?:jobs/view|comm/jobs|jobs/collections)/[^\s\"<>]+"),
