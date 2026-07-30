@@ -11,6 +11,7 @@
 """
 import asyncio
 import email
+import email.message
 import imaplib
 import logging
 import re
@@ -37,15 +38,21 @@ class Vacancy:
     source: str = "gmail"
 
 
-# Список отправителей, чьи письма про вакансии парсим
-# key: substring в From, value: (display_name, url_regex)
+# Отправители, чьи Job Alerts парсим из Gmail.
+# key: substring в From, value: (display_name, url_regex).
+# Чтобы включить LinkedIn/Indeed — подпишись на их Job Alerts (Weekly/Daily)
+# по запросу "Flutter" (+ Serbia / remote), письма приходят автоматически.
 SENDERS = {
     "hh.ru": ("HH.ru", r"https?://[^\s\"<>]*hh\.ru/vacancy/\d+"),
     "career.habr.com": ("Habr Career", r"https?://[^\s\"<>]*career\.habr\.com/vacancies/\d+"),
     "habr.com": ("Habr Career", r"https?://[^\s\"<>]*career\.habr\.com/vacancies/\d+"),
     "djinni.co": ("Djinni", r"https?://[^\s\"<>]*djinni\.co/jobs/\d+"),
-    "linkedin.com": ("LinkedIn", r"https?://[^\s\"<>]*linkedin\.com/(?:jobs/view|comm/jobs)/\d+"),
+    "linkedin.com": ("LinkedIn",
+                     r"https?://[^\s\"<>]*linkedin\.com/(?:jobs/view|comm/jobs|jobs/collections)/[^\s\"<>]+"),
+    "indeed.com": ("Indeed",
+                   r"https?://[^\s\"<>]*indeed\.com/(?:rc/clk|viewjob|jobs)[^\s\"<>]*jk=[a-zA-Z0-9]+"),
     "getmatch.ru": ("getmatch", r"https?://[^\s\"<>]*getmatch\.ru/vacancies/\d+"),
+    "geekjob.ru": ("GeekJob", r"https?://[^\s\"<>]*geekjob\.ru/vacancy/[a-z0-9]+"),
 }
 
 def is_enabled() -> bool:
