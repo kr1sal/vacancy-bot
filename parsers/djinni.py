@@ -1,4 +1,5 @@
 """Djinni.co RSS-парсер. Много EU/remote/relocate вакансий, включая Сербию."""
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
@@ -21,8 +22,10 @@ _HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     ),
+    "Accept": "application/rss+xml, application/xml, text/xml, */*",
     "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
 }
+_MIN_RSS_BYTES = 200  # ответы меньше этого — считаем битыми
 
 
 @dataclass
@@ -40,19 +43,17 @@ async def fetch_vacancies() -> list[Vacancy]:
     seen: set[str] = set()
     result: list[Vacancy] = []
 
-    async with httpx.AsyncClient(headers=_HEADERS, timeout=20, follow_redirects=True) as client:
+    async with httpx.AsyncClient(headers=_HEADERS, timeout=25, follow_redirects=True) as client:
         for url in DJINNI_RSS_URLS:
-            try:
-                resp = await client.get(url)
-                resp.raise_for_status()
-            except httpx.HTTPError as e:
-                logger.warning("Djinni fetch failed %s: %s", url, e)
+            xml_text = await _fetch_rss(client, url)
+            if not xml_text:
                 continue
 
             try:
-                root = ET.fromstring(resp.text)
+                root = ET.fromstring(xml_text)
             except ET.ParseError as e:
-                logger.warning("Djinni parse failed %s: %s", url, e)
+                logger.warning("Djinni: XML parse failed для %s (%d байт): %s",
+                               url, len(xml_text), e)
                 continue
 
             for item in root.findall(".//item"):
@@ -65,6 +66,31 @@ async def fetch_vacancies() -> list[Vacancy]:
                 result.append(v)
 
     return result
+
+
+async def _fetch_rss(client: httpx.AsyncClient, url: str, retries: int = 2) -> str | None:
+    """Тянет RSS с ретраями. Возвращает None если ответ пустой/битый."""
+    for attempt in range(retries + 1):
+        try:
+            resp = await client.get(url)
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            if attempt < retries:
+                await asyncio.sleep(1.5 * (attempt + 1))
+                continue
+            logger.warning("Djinni: fetch failed %s: %s", url, e)
+            return None
+
+        body = resp.text
+        if len(body) < _MIN_RSS_BYTES or "<rss" not in body[:200].lower():
+            if attempt < retries:
+                await asyncio.sleep(1.5 * (attempt + 1))
+                continue
+            logger.debug("Djinni: пустой/битый ответ (%d байт), status=%d",
+                         len(body), resp.status_code)
+            return None
+        return body
+    return None
 
 
 def _parse_item(item: ET.Element) -> Vacancy | None:
