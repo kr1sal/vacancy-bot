@@ -1,11 +1,11 @@
 # Скопируй этот блок в /etc/caddy/Caddyfile (или отдельный файл в conf.d/)
-# Замени bot.kr1sal.com на свой субдомен, если нужен другой.
+# Замени jobs.kr1sal.com на свой субдомен, если нужен другой.
 #
 # После правки:
 #   sudo caddy fmt --overwrite /etc/caddy/Caddyfile
 #   sudo systemctl reload caddy
 
-bot.kr1sal.com {
+jobs.kr1sal.com {
     encode gzip zstd
 
     # WebSocket и SSE не используются — обычный HTTP-прокси
@@ -17,7 +17,7 @@ bot.kr1sal.com {
 
     # Логи — по желанию
     log {
-        output file /var/log/caddy/bot.kr1sal.com.log {
+        output file /var/log/caddy/jobs.kr1sal.com.log {
             roll_size 10mb
             roll_keep 5
         }

@@ -7,15 +7,15 @@
 ### 1. DNS
 В панели регистратора `kr1sal.com` — добавь A-запись:
 ```
-bot   A   <IP_ТВОЕГО_VPS>
+jobs   A   <IP_ТВОЕГО_VPS>
 ```
-Проверь: `dig +short bot.kr1sal.com` — должен вернуть IP VPS.
+Проверь: `dig +short jobs.kr1sal.com` — должен вернуть IP VPS.
 
 ### 2. BotFather /setdomain
 Иначе Telegram Login Widget работать не будет.
 1. [@BotFather](https://t.me/BotFather) → `/setdomain`
 2. Выбери бота (`Kr1saLVacancyBot`)
-3. Введи домен без `https://`: `bot.kr1sal.com`
+3. Введи домен без `https://`: `jobs.kr1sal.com`
 
 ### 3. Установка на VPS
 ```bash
@@ -45,7 +45,7 @@ BOT_TOKEN=... (новый, после /revoke)
 TELEGRAM_USER_ID=твой_id
 BOT_USERNAME=Kr1saLVacancyBot
 OPENROUTER_API_KEY=sk-or-v1-... (новый)
-WEBAPP_PUBLIC_URL=https://bot.kr1sal.com
+WEBAPP_PUBLIC_URL=https://jobs.kr1sal.com
 ```
 
 Опциональные (по желанию):
@@ -56,7 +56,7 @@ WEBAPP_PUBLIC_URL=https://bot.kr1sal.com
 ### 5. Caddy — добавь блок
 Скопируй из `deploy/Caddyfile.snippet`:
 ```caddyfile
-bot.kr1sal.com {
+jobs.kr1sal.com {
     encode gzip zstd
     reverse_proxy 127.0.0.1:8080 {
         header_up X-Real-IP {remote_host}
@@ -64,7 +64,7 @@ bot.kr1sal.com {
         header_up X-Forwarded-Proto {scheme}
     }
     log {
-        output file /var/log/caddy/bot.kr1sal.com.log
+        output file /var/log/caddy/jobs.kr1sal.com.log
         format console
     }
 }
@@ -87,7 +87,7 @@ sudo journalctl -u vacancy-bot -f
 Ждёшь строку `Chert Vacancy Bot started` — значит бот работает.
 
 ### 7. Проверка
-- Открой `https://bot.kr1sal.com/` в браузере (не в Telegram)
+- Открой `https://jobs.kr1sal.com/` в браузере (не в Telegram)
 - Должно редиректнуть на `/login` → виджет Telegram → авторизация → редирект на `/`
 - Внутри Telegram: `/start` у бота → кнопка «📱 Открыть приложение» → Mini App должна открыться без логина (у Telegram есть initData)
 
@@ -110,7 +110,7 @@ sudo tail -f /var/log/vacancy-bot.log
 
 **Логи Caddy:**
 ```bash
-sudo tail -f /var/log/caddy/bot.kr1sal.com.log
+sudo tail -f /var/log/caddy/jobs.kr1sal.com.log
 sudo journalctl -u caddy -n 50
 ```
 
@@ -121,7 +121,7 @@ curl -sI http://127.0.0.1:8080/ | head -3
 
 **Проверить внешний доступ:**
 ```bash
-curl -sI https://bot.kr1sal.com/ | head -3
+curl -sI https://jobs.kr1sal.com/ | head -3
 ```
 
 ## SSH reverse tunnel (альтернатива — бот у себя на PC)
