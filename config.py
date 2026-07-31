@@ -52,6 +52,6 @@ VACANCY_STOPWORDS = [
     s.strip().lower() for s in os.environ.get("VACANCY_STOPWORDS", "").split(",") if s.strip()
 ]
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "vacancies.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "vacancies.db"))
 CV_PATH = os.path.join(os.path.dirname(__file__), "..", "CV.md")
 COVER_LETTER_EXAMPLE_PATH = os.path.join(os.path.dirname(__file__), "..", "cover_letter_AMA.txt")

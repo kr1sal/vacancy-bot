@@ -9,7 +9,8 @@ jobs.kr1sal.com {
     encode gzip zstd
 
     # WebSocket и SSE не используются — обычный HTTP-прокси
-    reverse_proxy 127.0.0.1:8080 {
+    # Порт 8081, не 8080 — 8080 на этом VPS занят другим контейнером (см. docker-compose.yml)
+    reverse_proxy 127.0.0.1:8081 {
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
