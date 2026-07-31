@@ -37,11 +37,15 @@ _NO_CACHE = {
 # ── Telegram initData (Mini App) ──────────────────────────────────────────────
 
 def _verify_init_data(init_data: str) -> int | None:
+    """https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+
+    `signature` — отдельное ed25519-поле для сценариев без доступа к bot token
+    (валидация публичным ключом Telegram); в HMAC data-check-string оно
+    участвует как обычное поле и исключать его нельзя — только `hash`."""
     if not init_data:
         return None
     parsed = dict(parse_qsl(init_data, keep_blank_values=True))
     received_hash = parsed.pop("hash", None)
-    parsed.pop("signature", None)
     if not received_hash:
         return None
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
@@ -160,36 +164,29 @@ def _requires_login(request: Request) -> bool:
 
 
 # ── HTML routes ───────────────────────────────────────────────────────────────
-
-def _has_browser_session(request: Request) -> bool:
-    """Есть ли валидная браузерная сессия (cookie или dev-localhost) для HTML-редиректов.
-
-    Mini App (X-Telegram-Init-Data) сюда не попадает — там редиректов не бывает."""
-    session = request.cookies.get(SESSION_COOKIE, "")
-    session_ok = _verify_session_token(session) == TELEGRAM_USER_ID
-    local_ok = not _is_via_cloudflare(request) and \
-               (request.client.host if request.client else "") in ("127.0.0.1", "localhost", "::1")
-    return session_ok or local_ok
-
+#
+# Telegram передаёт initData не HTTP-заголовком, а фрагментом URL (#tgWebAppData=...),
+# который до сервера физически не долетает — это разбирает только клиентский JS
+# (telegram-web-app.js) уже после загрузки страницы. Поэтому здесь НЕЛЬЗЯ решить
+# «это Mini App или обычный браузер» и редиректить на /login синхронно: до первого
+# открытия страницы такой редирект просто не даёт JS дожить до момента, когда он
+# мог бы прочитать initData — итог «не входит», причём одинаково на всех платформах.
+# Раздаём SPA всегда; авторизацию (initData из tg.WebApp / сессионная кука) решает
+# сам фронтенд при первом вызове /api/* — см. функцию api() и её редирект на /login
+# при 401 у обычного браузера без initData.
 
 @app.get("/")
-async def index(request: Request):
-    if not request.headers.get("X-Telegram-Init-Data") and not _has_browser_session(request):
-        return RedirectResponse(url="/login", status_code=302)
+async def index():
     return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
 
 
 @app.get("/vacancy/{vid}")
-async def vacancy_page(vid: str, request: Request):
-    if not request.headers.get("X-Telegram-Init-Data") and not _has_browser_session(request):
-        return RedirectResponse(url=f"/login?next=/vacancy/{vid}", status_code=302)
+async def vacancy_page(vid: str):
     return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
 
 
 @app.get("/match")
-async def match_page(request: Request):
-    if not request.headers.get("X-Telegram-Init-Data") and not _has_browser_session(request):
-        return RedirectResponse(url="/login?next=/match", status_code=302)
+async def match_page():
     return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
 
 
