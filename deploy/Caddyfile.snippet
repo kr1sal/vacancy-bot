@@ -1,0 +1,27 @@
+# Скопируй этот блок в /etc/caddy/Caddyfile (или отдельный файл в conf.d/)
+# Замени bot.kr1sal.com на свой субдомен, если нужен другой.
+#
+# После правки:
+#   sudo caddy fmt --overwrite /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+
+bot.kr1sal.com {
+    encode gzip zstd
+
+    # WebSocket и SSE не используются — обычный HTTP-прокси
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Логи — по желанию
+    log {
+        output file /var/log/caddy/bot.kr1sal.com.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+        format console
+        level INFO
+    }
+}

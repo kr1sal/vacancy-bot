@@ -1,32 +1,39 @@
 #!/usr/bin/env bash
-# Установка Chert Vacancy Bot на Ubuntu/Debian VPS.
-# Запусти под root или через sudo. Меняй DOMAIN на свой субдомен.
+# Устанавливает Chert Vacancy Bot на Ubuntu/Debian VPS.
+# Не трогает web-сервер — предполагается, что у тебя уже настроен Caddy или nginx.
+# После скрипта пропиши reverse-proxy на 127.0.0.1:8080 (см. deploy/Caddyfile.snippet).
 #
-#   sudo DOMAIN=bot.kr1sal.com bash deploy/install.sh
+#   sudo bash deploy/install.sh
 #
-# Требования: Ubuntu 22.04+ / Debian 12+, домен указывает A-записью на этот VPS.
+# Опции через переменные окружения:
+#   REPO_URL=https://github.com/kr1sal/vacancy-bot.git  — откуда клонить
+#   APP_DIR=/opt/vacancy-bot                             — куда ставить
 
 set -euo pipefail
 
-DOMAIN="${DOMAIN:?Задай DOMAIN=bot.example.com}"
 REPO_URL="${REPO_URL:-https://github.com/kr1sal/vacancy-bot.git}"
-APP_DIR="/opt/vacancy-bot"
+APP_DIR="${APP_DIR:-/opt/vacancy-bot}"
 APP_USER="vacancy"
 
-echo "==> 1. Пакеты"
+if [[ $EUID -ne 0 ]]; then
+    echo "❌ Запусти под root: sudo bash $0"
+    exit 1
+fi
+
+echo "==> 1. Пакеты Python (nginx / caddy — отдельно, не трогаем)"
 apt update
-apt install -y python3 python3-venv python3-pip git nginx certbot python3-certbot-nginx
+apt install -y python3 python3-venv python3-pip git
 
 echo "==> 2. Пользователь $APP_USER"
 if ! id "$APP_USER" &>/dev/null; then
     useradd --system --create-home --home-dir "$APP_DIR" --shell /bin/bash "$APP_USER"
 fi
 
-echo "==> 3. Клон репо в $APP_DIR"
+echo "==> 3. Клон/обновление репо в $APP_DIR"
 if [ ! -d "$APP_DIR/.git" ]; then
     sudo -u "$APP_USER" git clone "$REPO_URL" "$APP_DIR"
 else
-    cd "$APP_DIR" && sudo -u "$APP_USER" git pull
+    cd "$APP_DIR" && sudo -u "$APP_USER" git pull --ff-only
 fi
 
 echo "==> 4. Виртуальное окружение + зависимости"
@@ -40,10 +47,9 @@ if [ ! -f "$APP_DIR/.env" ]; then
     chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
     chmod 600 "$APP_DIR/.env"
     echo ""
-    echo "  ⚠️  Отредактируй $APP_DIR/.env:"
-    echo "     BOT_TOKEN, TELEGRAM_USER_ID, OPENROUTER_API_KEY"
-    echo "     WEBAPP_PUBLIC_URL=https://$DOMAIN"
-    echo ""
+    echo "   Дальше отредактируй $APP_DIR/.env — там пусто, кроме плейсхолдеров."
+else
+    chmod 600 "$APP_DIR/.env"
 fi
 
 echo "==> 6. systemd unit"
@@ -53,18 +59,21 @@ chown "$APP_USER:$APP_USER" /var/log/vacancy-bot.log
 systemctl daemon-reload
 systemctl enable vacancy-bot
 
-echo "==> 7. nginx"
-sed "s/bot\.kr1sal\.com/$DOMAIN/g" "$APP_DIR/deploy/nginx.conf" > "/etc/nginx/sites-available/$DOMAIN"
-ln -sf "/etc/nginx/sites-available/$DOMAIN" "/etc/nginx/sites-enabled/$DOMAIN"
-nginx -t
-systemctl reload nginx
-
-echo "==> 8. HTTPS через Let's Encrypt"
-certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect
-
 echo ""
-echo "✅ Готово. Дальше:"
-echo "   1. sudo nano $APP_DIR/.env       # заполни секреты"
-echo "   2. sudo systemctl start vacancy-bot"
-echo "   3. sudo journalctl -u vacancy-bot -f    # логи"
-echo "   4. Открой https://$DOMAIN в браузере — должен показать Mini App"
+echo "✅ Python-часть готова. Что дальше:"
+echo ""
+echo "   1. Заполни .env:"
+echo "        sudo -u $APP_USER nano $APP_DIR/.env"
+echo "      Обязательные: BOT_TOKEN, TELEGRAM_USER_ID, OPENROUTER_API_KEY,"
+echo "      BOT_USERNAME, WEBAPP_PUBLIC_URL=https://bot.kr1sal.com"
+echo ""
+echo "   2. Добавь в /etc/caddy/Caddyfile блок из deploy/Caddyfile.snippet,"
+echo "      затем: sudo systemctl reload caddy"
+echo ""
+echo "   3. Запусти бота:"
+echo "        sudo systemctl start vacancy-bot"
+echo "        sudo journalctl -u vacancy-bot -f"
+echo ""
+echo "   4. У @BotFather: /setdomain -> выбери бота -> bot.kr1sal.com"
+echo ""
+echo "   5. Открой https://bot.kr1sal.com/ — редирект на /login, войди через Telegram."

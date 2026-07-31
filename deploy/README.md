@@ -1,67 +1,138 @@
-# Deploy на VPS
+# Deploy на VPS с Caddy
 
-Ubuntu 22.04+ / Debian 12+, домен указывает A-записью на VPS.
+Предполагается: Ubuntu/Debian VPS, [Caddy](https://caddyserver.com/) уже установлен и работает.
 
-## Быстрый старт
+## Пошагово
 
+### 1. DNS
+В панели регистратора `kr1sal.com` — добавь A-запись:
+```
+bot   A   <IP_ТВОЕГО_VPS>
+```
+Проверь: `dig +short bot.kr1sal.com` — должен вернуть IP VPS.
+
+### 2. BotFather /setdomain
+Иначе Telegram Login Widget работать не будет.
+1. [@BotFather](https://t.me/BotFather) → `/setdomain`
+2. Выбери бота (`Kr1saLVacancyBot`)
+3. Введи домен без `https://`: `bot.kr1sal.com`
+
+### 3. Установка на VPS
 ```bash
-# на VPS под root
-apt update && apt install -y git
+# на VPS под root или через sudo
+apt install -y git
 git clone https://github.com/kr1sal/vacancy-bot.git /tmp/vb
-sudo DOMAIN=bot.kr1sal.com bash /tmp/vb/deploy/install.sh
+sudo bash /tmp/vb/deploy/install.sh
 ```
 
-Скрипт установит python + nginx + certbot, создаст системного пользователя `vacancy`,
-клонирует репо в `/opt/vacancy-bot`, поднимет venv, поставит зависимости, настроит
-systemd-unit и nginx с Let's Encrypt HTTPS.
+Что делает `install.sh`:
+- Ставит `python3-venv`, `git`
+- Создаёт системного пользователя `vacancy`
+- Клонирует репо в `/opt/vacancy-bot`, поднимает venv, ставит зависимости
+- Копирует `.env.example → .env` (chmod 600, owner: vacancy)
+- Регистрирует и включает systemd unit `vacancy-bot.service`
 
-## После установки
+Web-сервер скрипт **не трогает** — у тебя уже свой Caddy.
 
-1. Заполни `.env`:
-   ```bash
-   sudo nano /opt/vacancy-bot/.env
-   ```
-   Обязательные:
-   - `BOT_TOKEN`, `TELEGRAM_USER_ID`, `OPENROUTER_API_KEY`
-   - `WEBAPP_PUBLIC_URL=https://bot.kr1sal.com`
-   - `BOT_USERNAME=Kr1saLVacancyBot` — без `@`, точное имя бота
-2. Запусти:
-   ```bash
-   sudo systemctl start vacancy-bot
-   sudo journalctl -u vacancy-bot -f
-   ```
+### 4. Заполни `.env`
+```bash
+sudo -u vacancy nano /opt/vacancy-bot/.env
+```
 
-## Настройка Telegram Login Widget
+Обязательные (с ротированными ключами):
+```env
+BOT_TOKEN=... (новый, после /revoke)
+TELEGRAM_USER_ID=твой_id
+BOT_USERNAME=Kr1saLVacancyBot
+OPENROUTER_API_KEY=sk-or-v1-... (новый)
+WEBAPP_PUBLIC_URL=https://bot.kr1sal.com
+```
 
-Чтобы можно было заходить в Mini App из обычного браузера (не только из Telegram):
+Опциональные (по желанию):
+- `GMAIL_USER` / `GMAIL_APP_PASSWORD` — для Gmail-парсера
+- `VACANCY_STOPWORDS` — стоп-слова, чтобы срезать senior-only
+- `WEBAPP_LOCAL_TOKEN` — секрет для curl из своих скриптов
 
-1. Открой [@BotFather](https://t.me/BotFather) → `/setdomain` → выбери бота
-2. Введи домен **без** `https://`: `bot.kr1sal.com`
-3. Открой `https://bot.kr1sal.com/` — должно редиректить на `/login`
-4. Виджет «Log in with Telegram» → подтверждаешь → сессия сохраняется в
-   HttpOnly cookie на 30 дней (настраивается `SESSION_MAX_AGE_DAYS`)
+### 5. Caddy — добавь блок
+Скопируй из `deploy/Caddyfile.snippet`:
+```caddyfile
+bot.kr1sal.com {
+    encode gzip zstd
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    log {
+        output file /var/log/caddy/bot.kr1sal.com.log
+        format console
+    }
+}
+```
 
-Session-токен подписан HMAC от `BOT_TOKEN`, stateless — сервер не хранит
-сессии в БД. Внутри Telegram Mini App работает как раньше через initData.
+Вставь в `/etc/caddy/Caddyfile` (после существующих блоков), затем:
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
 
-## Обновление после git push
+Caddy сам получит Let's Encrypt cert для нового субдомена — ничего дополнительно не нужно.
 
+### 6. Запуск
+```bash
+sudo systemctl start vacancy-bot
+sudo journalctl -u vacancy-bot -f
+```
+
+Ждёшь строку `Chert Vacancy Bot started` — значит бот работает.
+
+### 7. Проверка
+- Открой `https://bot.kr1sal.com/` в браузере (не в Telegram)
+- Должно редиректнуть на `/login` → виджет Telegram → авторизация → редирект на `/`
+- Внутри Telegram: `/start` у бота → кнопка «📱 Открыть приложение» → Mini App должна открыться без логина (у Telegram есть initData)
+
+## Обновление после `git push`
 ```bash
 cd /opt/vacancy-bot
-sudo -u vacancy git pull
+sudo -u vacancy git pull --ff-only
 sudo -u vacancy .venv/bin/pip install -r requirements.txt
 sudo systemctl restart vacancy-bot
 ```
 
-## SSH reverse tunnel (альтернатива, бот у себя на PC)
+## Диагностика
 
-Если хочешь запускать бот локально, а VPS использовать только как HTTPS-прокси:
+**Логи бота:**
+```bash
+sudo journalctl -u vacancy-bot -n 100 -f
+# или
+sudo tail -f /var/log/vacancy-bot.log
+```
 
-**На VPS:** установи только nginx + certbot по `deploy/nginx.conf`, без бота.
+**Логи Caddy:**
+```bash
+sudo tail -f /var/log/caddy/bot.kr1sal.com.log
+sudo journalctl -u caddy -n 50
+```
 
-**На локальной машине** держи SSH-туннель:
+**Проверить что бот отвечает изнутри VPS:**
+```bash
+curl -sI http://127.0.0.1:8080/ | head -3
+```
+
+**Проверить внешний доступ:**
+```bash
+curl -sI https://bot.kr1sal.com/ | head -3
+```
+
+## SSH reverse tunnel (альтернатива — бот у себя на PC)
+
+Если хочешь запускать бота на своей машине, а VPS использовать только как HTTPS-прокси:
+
+**На VPS:** только Caddy-блок из шага 5 (без установки бота).
+
+**На локальной машине:**
 ```powershell
 ssh -N -R 8080:127.0.0.1:8080 root@kr1sal.com
 ```
 
-Работает пока сессия открыта. Для persistent-туннеля — [autossh](https://www.harding.motd.ca/autossh/).
+Работает пока SSH-сессия открыта. Для persistent — [autossh](https://www.harding.motd.ca/autossh/) как systemd-unit.
