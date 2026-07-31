@@ -91,6 +91,13 @@ async def index():
     return FileResponse(_INDEX_PATH)
 
 
+@app.get("/vacancy/{vid}")
+async def vacancy_page(vid: str):
+    """SPA-роутинг: /vacancy/<id> отдаёт тот же index.html,
+    клиент прочитает pathname и откроет нужную вакансию."""
+    return FileResponse(_INDEX_PATH)
+
+
 @app.get("/api/counts")
 async def api_counts(request: Request):
     _check_auth(request)

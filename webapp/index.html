@@ -7,6 +7,7 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root {
+    /* Светлая тема (по умолчанию + фолбэк, если Telegram не передал vars) */
     --bg: var(--tg-theme-bg-color, #ffffff);
     --card: var(--tg-theme-secondary-bg-color, #f4f4f5);
     --text: var(--tg-theme-text-color, #1a1a1e);
@@ -14,6 +15,51 @@
     --link: var(--tg-theme-link-color, #7c40c0);
     --btn: var(--tg-theme-button-color, #7c40c0);
     --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --border: rgba(128, 128, 140, 0.18);
+    --accent: #7c40c0;
+    --star: #f5b301;
+    --success: #1a8f8f;
+  }
+
+  /* Автоматическая тёмная по системным настройкам, если Telegram vars не заданы */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: var(--tg-theme-bg-color, #17171c);
+      --card: var(--tg-theme-secondary-bg-color, #23232b);
+      --text: var(--tg-theme-text-color, #f0f0f5);
+      --muted: var(--tg-theme-hint-color, #8a8a95);
+      --link: var(--tg-theme-link-color, #b088e6);
+      --btn: var(--tg-theme-button-color, #7c40c0);
+      --btn-text: var(--tg-theme-button-text-color, #ffffff);
+      --border: rgba(200, 200, 210, 0.14);
+      --accent: #b088e6;
+      --star: #f5b301;
+      --success: #4dc3c3;
+    }
+  }
+
+  /* Явное переключение через toggle или data-theme */
+  :root[data-theme="dark"] {
+    --bg: #17171c;
+    --card: #23232b;
+    --text: #f0f0f5;
+    --muted: #8a8a95;
+    --link: #b088e6;
+    --btn: #7c40c0;
+    --btn-text: #ffffff;
+    --border: rgba(200, 200, 210, 0.14);
+    --accent: #b088e6;
+    --star: #f5b301;
+    --success: #4dc3c3;
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff;
+    --card: #f4f4f5;
+    --text: #1a1a1e;
+    --muted: #8a8a92;
+    --link: #7c40c0;
+    --btn: #7c40c0;
+    --btn-text: #ffffff;
     --border: rgba(128, 128, 140, 0.18);
     --accent: #7c40c0;
     --star: #f5b301;
@@ -151,6 +197,24 @@
     background: none; border: none;
     color: var(--link); font-size: 15px; font-weight: 500;
     cursor: pointer; padding: 4px 6px; margin-left: -6px;
+    flex: 1; text-align: left;
+  }
+  .header-icon-btn {
+    background: none; border: none;
+    font-size: 22px; line-height: 1;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: var(--muted);
+    transition: transform 0.1s;
+  }
+  .header-icon-btn:active { transform: scale(0.9); }
+  .header-icon-btn.star.on { color: var(--star); }
+  .theme-toggle {
+    background: none; border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: var(--muted);
+    font-size: 18px; line-height: 1;
   }
 
   .details-body { padding: 14px 16px 100px; overflow-y: auto; flex: 1; }
@@ -286,7 +350,10 @@
   <!-- LIST VIEW -->
   <div id="list-view">
     <div class="header">
-      <div class="title">Chert Vacancy Bot <span id="total-hint"></span></div>
+      <div class="title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Chert Vacancy Bot <span id="total-hint"></span></span>
+        <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌓</button>
+      </div>
       <div class="tabs" id="tabs">
         <button class="tab active" data-filter="new">🆕 Новые <span class="badge" id="c-new">0</span></button>
         <button class="tab" data-filter="viewed">👁 Просмотренные <span class="badge" id="c-viewed">0</span></button>
@@ -304,6 +371,7 @@
   <div class="details" id="details-view">
     <div class="details-header">
       <button class="back-btn" id="back-btn">← Назад</button>
+      <button class="header-icon-btn star" id="details-star" title="Отметить">☆</button>
     </div>
     <div class="details-body" id="details-body"></div>
     <div class="actions" id="details-actions"></div>
@@ -320,6 +388,36 @@ const state = {
   filter: 'new',
   vacancies: [],
   currentId: null,
+};
+
+// ── Тема ───────────────────────────────────────────────
+function applyTheme(theme) {
+  if (theme === 'light' || theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', theme);
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+}
+(function initTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved) applyTheme(saved);
+  // если Telegram сообщает свою тему — используем её
+  if (tg && tg.colorScheme && !saved) {
+    applyTheme(tg.colorScheme);
+  }
+})();
+document.getElementById('theme-toggle').onclick = () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : (current === 'light' ? 'auto' : 'dark');
+  if (next === 'auto') {
+    localStorage.removeItem('theme');
+    applyTheme(null);
+    toast('Тема: авто');
+  } else {
+    localStorage.setItem('theme', next);
+    applyTheme(next);
+    toast(`Тема: ${next === 'dark' ? 'тёмная' : 'светлая'}`);
+  }
 };
 
 function initData() {
@@ -445,25 +543,55 @@ async function toggleStar(vid, btn) {
   } catch (e) { toast('Не удалось: ' + e.message); }
 }
 
-async function openDetails(vid) {
+async function openDetails(vid, { push = true } = {}) {
   state.currentId = vid;
   document.getElementById('list-view').style.display = 'none';
   document.getElementById('details-view').classList.add('active');
   const body = document.getElementById('details-body');
   const actions = document.getElementById('details-actions');
+  const starBtn = document.getElementById('details-star');
   body.innerHTML = '<div class="empty">Загрузка…</div>';
   actions.innerHTML = '';
+  starBtn.style.display = 'none';
+
+  if (push) {
+    const targetPath = `/vacancy/${encodeURIComponent(vid)}`;
+    if (location.pathname !== targetPath) {
+      history.pushState({ vid }, '', targetPath);
+    }
+  }
+
   try {
     await api(`/api/vacancies/${vid}/view`, { method: 'POST' });
     const v = await api(`/api/vacancies/${vid}`);
     renderDetails(v);
+    setDetailsStar(v);
     loadCounts();
-    // update local card state
     const local = state.vacancies.find(x => x.id === vid);
     if (local) local.viewed = true;
   } catch (e) {
     body.innerHTML = `<div class="empty">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
+  updateBackBtn();
+}
+
+function setDetailsStar(v) {
+  const btn = document.getElementById('details-star');
+  btn.style.display = '';
+  btn.classList.toggle('on', !!v.starred);
+  btn.textContent = v.starred ? '★' : '☆';
+  btn.onclick = async () => {
+    try {
+      const { starred } = await api(`/api/vacancies/${v.id}/star`, { method: 'POST' });
+      v.starred = starred;
+      btn.classList.toggle('on', starred);
+      btn.textContent = starred ? '★' : '☆';
+      const local = state.vacancies.find(x => x.id === v.id);
+      if (local) local.starred = starred;
+      loadCounts();
+      toast(starred ? 'Отмечено' : 'Отметка снята');
+    } catch (e) { toast('Ошибка: ' + e.message); }
+  };
 }
 
 function renderDetails(v) {
@@ -604,14 +732,28 @@ function renderDetails(v) {
   }
 }
 
-function closeDetails() {
+function closeDetails({ push = true } = {}) {
   document.getElementById('details-view').classList.remove('active');
   document.getElementById('list-view').style.display = '';
   state.currentId = null;
+  if (push && location.pathname !== '/') {
+    history.pushState({}, '', '/');
+  }
   loadList();
+  updateBackBtn();
 }
 
-document.getElementById('back-btn').onclick = closeDetails;
+document.getElementById('back-btn').onclick = () => closeDetails();
+
+// SPA роутинг: реакция на back/forward браузера
+window.addEventListener('popstate', () => {
+  const m = location.pathname.match(/^\/vacancy\/(.+)$/);
+  if (m) {
+    openDetails(decodeURIComponent(m[1]), { push: false });
+  } else if (state.currentId) {
+    closeDetails({ push: false });
+  }
+});
 
 document.getElementById('tabs').addEventListener('click', e => {
   const btn = e.target.closest('.tab');
@@ -622,25 +764,30 @@ document.getElementById('tabs').addEventListener('click', e => {
   loadList();
 });
 
-// Telegram back button integration
+// Telegram back button — синхронизируем видимость с состоянием
+function updateBackBtn() {
+  if (!tg || !tg.BackButton) return;
+  if (state.currentId) tg.BackButton.show();
+  else tg.BackButton.hide();
+}
 if (tg && tg.BackButton) {
   tg.BackButton.onClick(() => {
     if (state.currentId) closeDetails();
     else tg.close();
   });
-  const updateBackBtn = () => {
-    if (state.currentId) tg.BackButton.show();
-    else tg.BackButton.hide();
-  };
-  const origOpen = openDetails;
-  openDetails = async function(vid) { await origOpen(vid); updateBackBtn(); };
-  const origClose = closeDetails;
-  closeDetails = function() { origClose(); updateBackBtn(); };
 }
 
+// Стартовая загрузка + deeplink: если URL /vacancy/<id> — открываем деталь
 loadCounts();
 loadList();
 setInterval(loadCounts, 30000);
+
+(function initialRoute() {
+  const m = location.pathname.match(/^\/vacancy\/(.+)$/);
+  if (m) {
+    openDetails(decodeURIComponent(m[1]), { push: false });
+  }
+})();
 </script>
 </body>
 </html>
