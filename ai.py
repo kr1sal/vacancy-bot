@@ -62,18 +62,27 @@ def summarize_vacancy(title: str, company: str, description: str) -> dict:
 
 Если поле извлечь невозможно — ставь 'не указано'."""
 
+    fallback = {
+        "stack": "не удалось извлечь",
+        "experience": "не указан",
+        "conditions": "см. вакансию",
+        "company_about": company,
+    }
     try:
         raw = _call(SUMMARY_MODEL, prompt, max_tokens=500)
         raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        # LLM изредка отдаёт [{...}] вместо {...}. Забираем первый элемент.
+        if isinstance(parsed, list):
+            parsed = parsed[0] if parsed and isinstance(parsed[0], dict) else {}
+        if not isinstance(parsed, dict):
+            logger.warning("Summary: неожиданный тип %s, использую fallback", type(parsed).__name__)
+            return fallback
+        # Приводим значения к строкам, чтобы карточка не упала на .get()
+        return {k: str(v) if v is not None else "не указано" for k, v in parsed.items()}
     except Exception as e:
         logger.error("Vacancy summarize failed: %s", e)
-        return {
-            "stack": "не удалось извлечь",
-            "experience": "не указан",
-            "conditions": "см. вакансию",
-            "company_about": company,
-        }
+        return fallback
 
 
 def generate_cover_letter(

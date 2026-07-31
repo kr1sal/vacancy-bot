@@ -79,7 +79,9 @@ def _esc(s: str) -> str:
     return html_lib.escape(s or "")
 
 
-def _vacancy_message(v, summary: dict) -> tuple[str, InlineKeyboardMarkup]:
+def _vacancy_message(v, summary) -> tuple[str, InlineKeyboardMarkup]:
+    if not isinstance(summary, dict):
+        summary = {}
     salary_line = f"💰 <b>{_esc(v.salary)}</b>\n" if v.salary and v.salary not in ("не указана", "не указан") else ""
 
     text = (
@@ -87,10 +89,10 @@ def _vacancy_message(v, summary: dict) -> tuple[str, InlineKeyboardMarkup]:
         f"🏢 {_esc(v.company)}\n"
         f"{salary_line}"
         f"\n"
-        f"📋 <b>Стек:</b> {_esc(summary.get('stack', '—'))}\n"
-        f"🎯 <b>Опыт:</b> {_esc(summary.get('experience', '—'))}\n"
-        f"💼 <b>Условия:</b> {_esc(summary.get('conditions', '—'))}\n"
-        f"🏭 <b>Компания:</b> {_esc(summary.get('company_about', '—'))}\n"
+        f"📋 <b>Стек:</b> {_esc(str(summary.get('stack', '—')))}\n"
+        f"🎯 <b>Опыт:</b> {_esc(str(summary.get('experience', '—')))}\n"
+        f"💼 <b>Условия:</b> {_esc(str(summary.get('conditions', '—')))}\n"
+        f"🏭 <b>Компания:</b> {_esc(str(summary.get('company_about', '—')))}\n"
         f"\n"
         f"🔗 <a href='{_esc(v.url)}'>Открыть вакансию</a>"
     )
