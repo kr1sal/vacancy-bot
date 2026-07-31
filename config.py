@@ -7,6 +7,12 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 TELEGRAM_USER_ID = int(os.environ["TELEGRAM_USER_ID"])
 OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
 
+# username бота (без @) для Telegram Login Widget на сайте
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "").strip().lstrip("@")
+
+# Сколько дней живёт сессия в браузере после Telegram Login
+SESSION_MAX_AGE_DAYS = int(os.environ.get("SESSION_MAX_AGE_DAYS", "30"))
+
 MESSAGE_DELAY_SECONDS = int(os.environ.get("MESSAGE_DELAY_SECONDS", "15"))
 CHECK_INTERVAL_MIN_SECONDS = int(os.environ.get("CHECK_INTERVAL_MIN_SECONDS", "60"))
 CHECK_INTERVAL_MAX_SECONDS = int(os.environ.get("CHECK_INTERVAL_MAX_SECONDS", "300"))

@@ -17,16 +17,32 @@ systemd-unit и nginx с Let's Encrypt HTTPS.
 
 ## После установки
 
-1. Заполни `.env` (BOT_TOKEN, TELEGRAM_USER_ID, OPENROUTER_API_KEY):
+1. Заполни `.env`:
    ```bash
    sudo nano /opt/vacancy-bot/.env
    ```
-2. Установи `WEBAPP_PUBLIC_URL=https://bot.kr1sal.com`.
-3. Запусти:
+   Обязательные:
+   - `BOT_TOKEN`, `TELEGRAM_USER_ID`, `OPENROUTER_API_KEY`
+   - `WEBAPP_PUBLIC_URL=https://bot.kr1sal.com`
+   - `BOT_USERNAME=Kr1saLVacancyBot` — без `@`, точное имя бота
+2. Запусти:
    ```bash
    sudo systemctl start vacancy-bot
    sudo journalctl -u vacancy-bot -f
    ```
+
+## Настройка Telegram Login Widget
+
+Чтобы можно было заходить в Mini App из обычного браузера (не только из Telegram):
+
+1. Открой [@BotFather](https://t.me/BotFather) → `/setdomain` → выбери бота
+2. Введи домен **без** `https://`: `bot.kr1sal.com`
+3. Открой `https://bot.kr1sal.com/` — должно редиректить на `/login`
+4. Виджет «Log in with Telegram» → подтверждаешь → сессия сохраняется в
+   HttpOnly cookie на 30 дней (настраивается `SESSION_MAX_AGE_DAYS`)
+
+Session-токен подписан HMAC от `BOT_TOKEN`, stateless — сервер не хранит
+сессии в БД. Внутри Telegram Mini App работает как раньше через initData.
 
 ## Обновление после git push
 

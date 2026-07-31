@@ -353,9 +353,12 @@
   <!-- LIST VIEW -->
   <div id="list-view">
     <div class="header">
-      <div class="title" style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <span>Chert Vacancy Bot <span id="total-hint"></span></span>
-        <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌓</button>
+        <span style="display:flex;gap:2px;">
+          <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌓</button>
+          <button class="theme-toggle" id="logout-btn" title="Выйти" style="display:none;">⎋</button>
+        </span>
       </div>
       <div class="tabs" id="tabs">
         <button class="tab active" data-filter="new">🆕 Новые <span class="badge" id="c-new">0</span></button>
@@ -409,6 +412,13 @@ function applyTheme(theme) {
     applyTheme(tg.colorScheme);
   }
 })();
+// Logout виден только в браузере (внутри Telegram — не показываем)
+if (!tg || !tg.initData) {
+  const lo = document.getElementById('logout-btn');
+  lo.style.display = '';
+  lo.onclick = () => logout();
+}
+
 document.getElementById('theme-toggle').onclick = () => {
   const current = document.documentElement.getAttribute('data-theme');
   const next = current === 'dark' ? 'light' : (current === 'light' ? 'auto' : 'dark');
@@ -433,9 +443,21 @@ async function api(path, opts = {}) {
     headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
   }
-  const resp = await fetch(path, { ...opts, headers });
+  const resp = await fetch(path, { ...opts, headers, credentials: 'same-origin' });
+  // Сессия истекла / нет прав — если это браузер (не Mini App), уводим на /login
+  if (resp.status === 401 && !initData()) {
+    location.href = '/login?next=' + encodeURIComponent(location.pathname);
+    throw new Error('unauthorized');
+  }
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
+}
+
+async function logout() {
+  try {
+    await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+  } catch {}
+  location.href = '/login';
 }
 
 function toast(text, duration = 2200) {
