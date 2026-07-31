@@ -86,16 +86,23 @@ def _check_auth(request: Request) -> None:
     raise HTTPException(status_code=403, detail="forbidden: no credentials")
 
 
+_NO_CACHE = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
 @app.get("/")
 async def index():
-    return FileResponse(_INDEX_PATH)
+    return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
 
 
 @app.get("/vacancy/{vid}")
 async def vacancy_page(vid: str):
     """SPA-роутинг: /vacancy/<id> отдаёт тот же index.html,
     клиент прочитает pathname и откроет нужную вакансию."""
-    return FileResponse(_INDEX_PATH)
+    return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
 
 
 @app.get("/api/counts")
