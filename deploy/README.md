@@ -14,7 +14,7 @@ jobs   A   <IP_ТВОЕГО_VPS>
 ### 2. BotFather /setdomain
 Иначе Telegram Login Widget работать не будет.
 1. [@BotFather](https://t.me/BotFather) → `/setdomain`
-2. Выбери бота (`Kr1saLVacancyBot`)
+2. Выбери бота (`kr1salvacancy_bot`)
 3. Введи домен без `https://`: `jobs.kr1sal.com`
 
 ### 3. Установка на VPS
@@ -43,7 +43,7 @@ sudo -u vacancy nano /opt/vacancy-bot/.env
 ```env
 BOT_TOKEN=... (новый, после /revoke)
 TELEGRAM_USER_ID=твой_id
-BOT_USERNAME=Kr1saLVacancyBot
+BOT_USERNAME=kr1salvacancy_bot
 OPENROUTER_API_KEY=sk-or-v1-... (новый)
 WEBAPP_PUBLIC_URL=https://jobs.kr1sal.com
 ```
