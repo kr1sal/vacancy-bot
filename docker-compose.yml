@@ -5,15 +5,20 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      # uvicorn должен слушать все интерфейсы контейнера, наружу отдаём
-      # только 127.0.0.1, реверс-прокси (Caddy) делает host сам.
+      # uvicorn должен слушать все интерфейсы контейнера — снаружи Docker-сети
+      # его никто не видит, наружу отдаёт только Caddy (контейнер), см. ниже.
       WEBAPP_HOST: 0.0.0.0
       DB_PATH: /app/data/vacancies.db
     ports:
-      # Хостовый порт 8080 уже занят другим контейнером на этом VPS — используем 8081.
-      # Caddy должен проксировать на 127.0.0.1:8081.
+      # Только для локальной отладки с хоста (curl 127.0.0.1:8081).
+      # Caddy (тоже в докере) ходит НЕ через этот порт, а по имени контейнера
+      # и внутреннему порту 8080 через сеть vacancy-bot-network (см. networks ниже).
       - "127.0.0.1:8081:8080"
     volumes:
       - ./data:/app/data
       - ../CV.md:/CV.md:ro
       - ../cover_letter_AMA.txt:/cover_letter_AMA.txt:ro
+
+networks:
+  default:
+    name: vacancy-bot-network
