@@ -1,0 +1,19 @@
+[Unit]
+Description=Chert Vacancy Bot
+After=network.target
+
+[Service]
+Type=simple
+User=vacancy
+Group=vacancy
+WorkingDirectory=/opt/vacancy-bot
+Environment="PATH=/opt/vacancy-bot/.venv/bin"
+EnvironmentFile=/opt/vacancy-bot/.env
+ExecStart=/opt/vacancy-bot/.venv/bin/python main.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/vacancy-bot.log
+StandardError=append:/var/log/vacancy-bot.log
+
+[Install]
+WantedBy=multi-user.target
