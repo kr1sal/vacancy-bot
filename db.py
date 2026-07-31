@@ -57,6 +57,7 @@ def init_db() -> None:
         _add_column_if_missing(conn, "seen_vacancies", "starred", "INTEGER DEFAULT 0")
         _add_column_if_missing(conn, "seen_vacancies", "applied", "INTEGER DEFAULT 0")
         _add_column_if_missing(conn, "seen_vacancies", "applied_at", "TIMESTAMP")
+        _add_column_if_missing(conn, "seen_vacancies", "match_decision", "TEXT")
 
 
 def is_seen(vacancy_id: str) -> bool:
@@ -137,6 +138,7 @@ def _serialize(row: sqlite3.Row) -> dict:
         "starred": bool(row["starred"]) if "starred" in keys else False,
         "applied": bool(row["applied"]) if "applied" in keys else False,
         "applied_at": row["applied_at"] if "applied_at" in keys else None,
+        "match_decision": row["match_decision"] if "match_decision" in keys else None,
         "seen_at": row["seen_at"],
         "summary": summary,
         "has_letter": bool(row["has_letter"]) if "has_letter" in keys else False,
@@ -183,6 +185,7 @@ def counts() -> dict:
                  SUM(CASE WHEN viewed = 1 THEN 1 ELSE 0 END) AS viewed_count,
                  SUM(CASE WHEN starred = 1 THEN 1 ELSE 0 END) AS starred_count,
                  SUM(CASE WHEN applied = 1 THEN 1 ELSE 0 END) AS applied_count,
+                 SUM(CASE WHEN match_decision IS NULL THEN 1 ELSE 0 END) AS match_pending_count,
                  COUNT(*) AS total
                FROM seen_vacancies"""
         ).fetchone()
@@ -191,8 +194,37 @@ def counts() -> dict:
             "viewed": row["viewed_count"] or 0,
             "starred": row["starred_count"] or 0,
             "applied": row["applied_count"] or 0,
+            "match_pending": row["match_pending_count"] or 0,
             "all": row["total"] or 0,
         }
+
+
+def match_queue(limit: int = 50) -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute(
+            """SELECT sv.*, s.summary_json,
+                      CASE WHEN l.vacancy_id IS NULL THEN 0 ELSE 1 END AS has_letter
+               FROM seen_vacancies sv
+               LEFT JOIN vacancy_summaries s ON s.vacancy_id = sv.id
+               LEFT JOIN generated_letters l ON l.vacancy_id = sv.id
+               WHERE sv.match_decision IS NULL
+               ORDER BY sv.seen_at DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [_serialize(r) for r in rows]
+
+
+def set_match_decision(vacancy_id: str, decision: str) -> bool:
+    with _conn() as conn:
+        row = conn.execute("SELECT id FROM seen_vacancies WHERE id = ?", (vacancy_id,)).fetchone()
+        if not row:
+            return False
+        conn.execute(
+            "UPDATE seen_vacancies SET match_decision = ?, viewed = 1 WHERE id = ?",
+            (decision, vacancy_id),
+        )
+        return True
 
 
 def save_letter(vacancy_id: str, letter: str) -> None:

@@ -161,29 +161,35 @@ def _requires_login(request: Request) -> bool:
 
 # ── HTML routes ───────────────────────────────────────────────────────────────
 
+def _has_browser_session(request: Request) -> bool:
+    """Есть ли валидная браузерная сессия (cookie или dev-localhost) для HTML-редиректов.
+
+    Mini App (X-Telegram-Init-Data) сюда не попадает — там редиректов не бывает."""
+    session = request.cookies.get(SESSION_COOKIE, "")
+    session_ok = _verify_session_token(session) == TELEGRAM_USER_ID
+    local_ok = not _is_via_cloudflare(request) and \
+               (request.client.host if request.client else "") in ("127.0.0.1", "localhost", "::1")
+    return session_ok or local_ok
+
+
 @app.get("/")
 async def index(request: Request):
-    # Если не Mini App и нет валидной сессии — редирект на /login
-    if not request.headers.get("X-Telegram-Init-Data"):
-        # проверяем всё, кроме initData (index обычный GET без header)
-        session = request.cookies.get(SESSION_COOKIE, "")
-        session_ok = _verify_session_token(session) == TELEGRAM_USER_ID
-        local_ok = not _is_via_cloudflare(request) and \
-                   (request.client.host if request.client else "") in ("127.0.0.1", "localhost", "::1")
-        if not session_ok and not local_ok:
-            return RedirectResponse(url="/login", status_code=302)
+    if not request.headers.get("X-Telegram-Init-Data") and not _has_browser_session(request):
+        return RedirectResponse(url="/login", status_code=302)
     return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
 
 
 @app.get("/vacancy/{vid}")
 async def vacancy_page(vid: str, request: Request):
-    if not request.headers.get("X-Telegram-Init-Data"):
-        session = request.cookies.get(SESSION_COOKIE, "")
-        session_ok = _verify_session_token(session) == TELEGRAM_USER_ID
-        local_ok = not _is_via_cloudflare(request) and \
-                   (request.client.host if request.client else "") in ("127.0.0.1", "localhost", "::1")
-        if not session_ok and not local_ok:
-            return RedirectResponse(url=f"/login?next=/vacancy/{vid}", status_code=302)
+    if not request.headers.get("X-Telegram-Init-Data") and not _has_browser_session(request):
+        return RedirectResponse(url=f"/login?next=/vacancy/{vid}", status_code=302)
+    return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
+
+
+@app.get("/match")
+async def match_page(request: Request):
+    if not request.headers.get("X-Telegram-Init-Data") and not _has_browser_session(request):
+        return RedirectResponse(url="/login?next=/match", status_code=302)
     return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
 
 
@@ -267,6 +273,24 @@ async def api_star(vid: str, request: Request):
     _check_auth(request)
     starred = db.toggle_star(vid)
     return {"ok": True, "starred": starred}
+
+
+@app.get("/api/match/queue")
+async def api_match_queue(request: Request):
+    _check_auth(request)
+    return db.match_queue()
+
+
+@app.post("/api/vacancies/{vid}/match")
+async def api_match_decide(vid: str, request: Request):
+    _check_auth(request)
+    body = await request.json()
+    decision = body.get("decision") if isinstance(body, dict) else None
+    if decision not in ("liked", "disliked"):
+        raise HTTPException(status_code=400, detail="invalid decision")
+    if not db.set_match_decision(vid, decision):
+        raise HTTPException(status_code=404, detail="not found")
+    return {"ok": True, "decision": decision}
 
 
 @app.post("/api/vacancies/{vid}/applied")

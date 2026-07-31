@@ -337,6 +337,75 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── Match view ─────────────────────────────────────── */
+  .match-view { display: none; flex-direction: column; height: 100%; }
+  .match-view.active { display: flex; }
+  .match-body {
+    flex: 1; position: relative; overflow: hidden;
+    padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0));
+    display: flex; align-items: center; justify-content: center;
+  }
+  .match-card-stack { position: relative; width: 100%; max-width: 420px; height: 100%; }
+  .match-card {
+    position: absolute; inset: 0;
+    background: var(--card);
+    border-radius: 18px;
+    padding: 18px 18px 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    touch-action: pan-y;
+    user-select: none;
+    will-change: transform;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+  .match-card.dragging { transition: none; }
+  .mc-star {
+    position: absolute; top: 10px; right: 10px;
+    background: var(--bg); border-radius: 50%;
+    width: 32px; height: 32px; font-size: 17px;
+  }
+  .mc-title { font-size: 19px; font-weight: 700; line-height: 1.25; margin-bottom: 4px; padding-right: 34px; }
+  .mc-company { font-size: 13.5px; color: var(--muted); margin-bottom: 10px; }
+  .mc-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .mc-summary { display: grid; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--text); }
+  .mc-summary b { color: var(--muted); font-weight: 600; }
+  .mc-desc {
+    font-size: 13px; line-height: 1.5; color: var(--text);
+    overflow-y: auto; flex: 1; white-space: pre-wrap;
+    border-top: 1px solid var(--border); padding-top: 10px;
+  }
+  .match-stamp {
+    position: absolute; top: 18px; padding: 5px 12px;
+    border: 3px solid; border-radius: 8px;
+    font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+    opacity: 0; pointer-events: none;
+  }
+  .match-stamp.like { left: 16px; color: var(--success); border-color: var(--success); transform: rotate(-15deg); }
+  .match-stamp.nope { right: 16px; color: #e5484d; border-color: #e5484d; transform: rotate(15deg); }
+
+  .match-actions {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 14px 20px calc(env(safe-area-inset-bottom, 0) + 14px);
+    background: var(--bg); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; gap: 22px;
+  }
+  .match-round-btn {
+    width: 56px; height: 56px; border-radius: 50%;
+    border: none; cursor: pointer; font-size: 24px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--card); color: var(--text);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    transition: transform 0.1s;
+  }
+  .match-round-btn:active { transform: scale(0.92); }
+  .match-round-btn:disabled { opacity: 0.5; }
+  .match-round-btn.reject { color: #e5484d; }
+  .match-round-btn.accept { color: var(--success); font-size: 26px; }
+  .match-round-btn.fav { width: 44px; height: 44px; font-size: 19px; color: var(--muted); }
+  .match-round-btn.fav.on { color: var(--star); }
+  .match-badge { font-size: 10px; font-weight: 700; margin-left: 1px; color: var(--accent); vertical-align: super; }
+
   .toast {
     position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,0.85); color: white;
@@ -356,6 +425,7 @@
       <div class="title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <span>Chert Vacancy Bot <span id="total-hint"></span></span>
         <span style="display:flex;gap:2px;">
+          <button class="theme-toggle" id="match-btn" title="Режим подбора">🔥<span class="match-badge" id="match-badge"></span></button>
           <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌓</button>
           <button class="theme-toggle" id="logout-btn" title="Выйти" style="display:none;">⎋</button>
         </span>
@@ -370,6 +440,22 @@
     </div>
     <div class="content" id="list-content">
       <div class="empty">Загрузка…</div>
+    </div>
+  </div>
+
+  <!-- MATCH VIEW -->
+  <div class="match-view" id="match-view">
+    <div class="details-header">
+      <button class="back-btn" id="match-back-btn">← Назад</button>
+      <div style="font-weight:700;font-size:15px;">🔥 Подбор</div>
+    </div>
+    <div class="match-body" id="match-body">
+      <div class="empty">Загрузка…</div>
+    </div>
+    <div class="match-actions" id="match-actions" style="display:none;">
+      <button class="match-round-btn reject" id="match-reject" title="Не интересно">✕</button>
+      <button class="match-round-btn fav" id="match-fav" title="В избранное">☆</button>
+      <button class="match-round-btn accept" id="match-accept" title="Откликнуться">♥</button>
     </div>
   </div>
 
@@ -394,6 +480,9 @@ const state = {
   filter: 'new',
   vacancies: [],
   currentId: null,
+  view: 'list',        // 'list' | 'match' | 'details'
+  detailsFrom: null,   // null | 'match' — куда вернёт «назад» из деталей
+  matchQueue: [],
 };
 
 // ── Тема ───────────────────────────────────────────────
@@ -483,6 +572,7 @@ async function loadCounts() {
     document.getElementById('c-applied').textContent = c.applied || 0;
     document.getElementById('c-all').textContent = c.all;
     document.getElementById('total-hint').textContent = c.all ? `· ${c.all}` : '';
+    document.getElementById('match-badge').textContent = c.match_pending ? c.match_pending : '';
   } catch (e) { console.error(e); }
 }
 
@@ -515,7 +605,7 @@ function renderList(vacancies) {
   content.querySelectorAll('.card').forEach(el => {
     el.addEventListener('click', e => {
       if (e.target.closest('.star')) return;
-      openDetails(el.dataset.id);
+      goDetails(el.dataset.id);
     });
   });
   content.querySelectorAll('.star').forEach(el => {
@@ -568,10 +658,42 @@ async function toggleStar(vid, btn) {
   } catch (e) { toast('Не удалось: ' + e.message); }
 }
 
-async function openDetails(vid, { push = true } = {}) {
+// ── Навигация между тремя экранами (list / match / details) ──────────────────
+// state.view хранит текущий экран, state.detailsFrom — откуда открыли карточку
+// (null = из списка, 'match' = из режима подбора), чтобы «назад» вело туда же.
+
+function showView(view) {
+  document.getElementById('list-view').style.display = view === 'list' ? '' : 'none';
+  document.getElementById('match-view').classList.toggle('active', view === 'match');
+  document.getElementById('details-view').classList.toggle('active', view === 'details');
+  state.view = view;
+  updateBackBtn();
+}
+
+function navigate(path) {
+  if (location.pathname + location.search !== path) {
+    history.pushState({}, '', path);
+  }
+}
+
+function goList({ push = true } = {}) {
+  showView('list');
+  if (push) navigate('/');
+  loadList();
+}
+
+function goMatch({ push = true } = {}) {
+  showView('match');
+  if (push) navigate('/match');
+  loadMatchQueue();
+}
+
+async function goDetails(vid, { push = true, from = null } = {}) {
   state.currentId = vid;
-  document.getElementById('list-view').style.display = 'none';
-  document.getElementById('details-view').classList.add('active');
+  state.detailsFrom = from !== null ? from : (state.view === 'match' ? 'match' : null);
+  showView('details');
+  document.getElementById('back-btn').textContent =
+    state.detailsFrom === 'match' ? '← К подбору' : '← Назад';
   const body = document.getElementById('details-body');
   const actions = document.getElementById('details-actions');
   const starBtn = document.getElementById('details-star');
@@ -580,10 +702,8 @@ async function openDetails(vid, { push = true } = {}) {
   starBtn.style.display = 'none';
 
   if (push) {
-    const targetPath = `/vacancy/${encodeURIComponent(vid)}`;
-    if (location.pathname !== targetPath) {
-      history.pushState({ vid }, '', targetPath);
-    }
+    const suffix = state.detailsFrom === 'match' ? '?from=match' : '';
+    navigate(`/vacancy/${encodeURIComponent(vid)}${suffix}`);
   }
 
   try {
@@ -597,7 +717,6 @@ async function openDetails(vid, { push = true } = {}) {
   } catch (e) {
     body.innerHTML = `<div class="empty">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
-  updateBackBtn();
 }
 
 function setDetailsStar(v) {
@@ -757,28 +876,221 @@ function renderDetails(v) {
   }
 }
 
-function closeDetails({ push = true } = {}) {
-  document.getElementById('details-view').classList.remove('active');
-  document.getElementById('list-view').style.display = '';
-  state.currentId = null;
-  if (push && location.pathname !== '/') {
-    history.pushState({}, '', '/');
+// ── Match (tinder-режим) ───────────────────────────────────────────────────
+
+async function loadMatchQueue() {
+  const body = document.getElementById('match-body');
+  document.getElementById('match-actions').style.display = 'none';
+  body.innerHTML = '<div class="empty">Загрузка…</div>';
+  try {
+    state.matchQueue = await api('/api/match/queue');
+    renderMatchStack();
+  } catch (e) {
+    body.innerHTML = `<div class="empty">Ошибка загрузки: ${escapeHtml(e.message)}</div>`;
   }
-  loadList();
-  updateBackBtn();
+}
+
+function matchCardHtml(v, index) {
+  const salary = v.salary && v.salary !== 'не указана' && v.salary !== 'не указан'
+    ? `<span class="card-salary">${escapeHtml(v.salary)}</span>` : '';
+  const srcLabel = SOURCE_LABELS[v.source] || (v.source || '?').toUpperCase();
+  const srcClass = `src-${v.source || 'unknown'}`;
+  const s = v.summary || {};
+  const scale = (1 - index * 0.04).toFixed(2);
+  const y = index * 10;
+  return `
+    <div class="match-card" data-id="${escapeHtml(v.id)}" data-top="${index === 0 ? '1' : '0'}"
+         style="z-index:${10 - index};transform:translateY(${y}px) scale(${scale});">
+      <button class="star mc-star ${v.starred ? 'on' : ''}" data-id="${escapeHtml(v.id)}">${v.starred ? '★' : '☆'}</button>
+      <div class="mc-title">${escapeHtml(v.title)}</div>
+      <div class="mc-company">${escapeHtml(v.company)}${salary ? ' · ' + salary : ''}</div>
+      <div class="mc-badges"><span class="badge-tag ${srcClass}">${srcLabel}</span></div>
+      ${v.summary ? `
+      <div class="mc-summary">
+        ${s.stack ? `<div><b>Стек:</b> ${escapeHtml(s.stack)}</div>` : ''}
+        ${s.experience ? `<div><b>Опыт:</b> ${escapeHtml(s.experience)}</div>` : ''}
+        ${s.conditions ? `<div><b>Условия:</b> ${escapeHtml(s.conditions)}</div>` : ''}
+      </div>` : ''}
+      <div class="mc-desc">${escapeHtml(v.description || '')}</div>
+      <div class="match-stamp like">Нравится</div>
+      <div class="match-stamp nope">Мимо</div>
+    </div>
+  `;
+}
+
+function renderMatchStack() {
+  const body = document.getElementById('match-body');
+  const actionsBar = document.getElementById('match-actions');
+  const queue = state.matchQueue;
+  if (!queue.length) {
+    actionsBar.style.display = 'none';
+    body.innerHTML = '<div class="empty">Вакансий для подбора пока нет 🎉</div>';
+    return;
+  }
+  actionsBar.style.display = '';
+  const top3 = queue.slice(0, 3);
+  body.innerHTML = `<div class="match-card-stack" id="match-stack">${top3.map(matchCardHtml).join('')}</div>`;
+  bindMatchCardEvents();
+  bindMatchActionButtons();
+}
+
+function bindMatchCardEvents() {
+  const stack = document.getElementById('match-stack');
+  if (!stack) return;
+  stack.querySelectorAll('.star').forEach(el => {
+    el.addEventListener('click', async e => {
+      e.stopPropagation();
+      await toggleStar(el.dataset.id, el);
+      const mv = state.matchQueue.find(x => x.id === el.dataset.id);
+      if (mv) mv.starred = el.classList.contains('on');
+      const favBtn = document.getElementById('match-fav');
+      if (favBtn && state.matchQueue[0] && state.matchQueue[0].id === el.dataset.id) {
+        favBtn.classList.toggle('on', mv.starred);
+        favBtn.textContent = mv.starred ? '★' : '☆';
+      }
+    });
+  });
+  const topCard = stack.querySelector('.match-card[data-top="1"]');
+  if (topCard) attachSwipe(topCard);
+}
+
+function flyOut(card, dir) {
+  card.classList.remove('dragging');
+  card.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
+  card.style.transform = `translate(${dir * 500}px, -40px) rotate(${dir * 30}deg)`;
+  card.style.opacity = '0';
+}
+
+function attachSwipe(card) {
+  let startX = 0, startY = 0, dx = 0, dy = 0, dragging = false, pointerId = null;
+  const likeStamp = card.querySelector('.match-stamp.like');
+  const nopeStamp = card.querySelector('.match-stamp.nope');
+
+  function onDown(e) {
+    if (e.target.closest('.mc-star')) return;
+    dragging = true;
+    pointerId = e.pointerId;
+    card.classList.add('dragging');
+    startX = e.clientX; startY = e.clientY;
+    card.setPointerCapture(pointerId);
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    dx = e.clientX - startX;
+    dy = e.clientY - startY;
+    card.style.transform = `translate(${dx}px, ${dy}px) rotate(${dx / 12}deg)`;
+    likeStamp.style.opacity = Math.min(Math.max(dx / 100, 0), 1);
+    nopeStamp.style.opacity = Math.min(Math.max(-dx / 100, 0), 1);
+  }
+  function onUp() {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove('dragging');
+    const threshold = 100;
+    if (dx > threshold) {
+      flyOut(card, 1);
+      decideMatch('liked');
+    } else if (dx < -threshold) {
+      flyOut(card, -1);
+      decideMatch('disliked');
+    } else {
+      card.style.transform = '';
+      likeStamp.style.opacity = 0;
+      nopeStamp.style.opacity = 0;
+    }
+    dx = 0; dy = 0;
+  }
+  card.addEventListener('pointerdown', onDown);
+  card.addEventListener('pointermove', onMove);
+  card.addEventListener('pointerup', onUp);
+  card.addEventListener('pointercancel', onUp);
+}
+
+function bindMatchActionButtons() {
+  const rejectBtn = document.getElementById('match-reject');
+  const acceptBtn = document.getElementById('match-accept');
+  const favBtn = document.getElementById('match-fav');
+  const stack = document.getElementById('match-stack');
+  const topCard = () => stack && stack.querySelector('.match-card[data-top="1"]');
+
+  rejectBtn.onclick = () => {
+    const top = topCard();
+    if (top) flyOut(top, -1);
+    decideMatch('disliked');
+  };
+  acceptBtn.onclick = () => {
+    const top = topCard();
+    if (top) flyOut(top, 1);
+    decideMatch('liked');
+  };
+
+  const v = state.matchQueue[0];
+  favBtn.classList.toggle('on', !!(v && v.starred));
+  favBtn.textContent = (v && v.starred) ? '★' : '☆';
+  favBtn.onclick = async () => {
+    if (!v) return;
+    try {
+      const { starred } = await api(`/api/vacancies/${v.id}/star`, { method: 'POST' });
+      v.starred = starred;
+      favBtn.classList.toggle('on', starred);
+      favBtn.textContent = starred ? '★' : '☆';
+      const top = topCard();
+      const cardStar = top && top.querySelector('.mc-star');
+      if (cardStar) { cardStar.classList.toggle('on', starred); cardStar.textContent = starred ? '★' : '☆'; }
+      loadCounts();
+      toast(starred ? 'Отмечено' : 'Отметка снята');
+    } catch (e) { toast('Ошибка: ' + e.message); }
+  };
+}
+
+async function decideMatch(decision) {
+  const v = state.matchQueue[0];
+  if (!v) return;
+  const bar = document.getElementById('match-actions');
+  bar.querySelectorAll('button').forEach(b => b.disabled = true);
+  try {
+    await api(`/api/vacancies/${v.id}/match`, { method: 'POST', body: { decision } });
+    state.matchQueue.shift();
+    loadCounts();
+    if (decision === 'liked') {
+      goDetails(v.id, { push: true, from: 'match' });
+      return;
+    }
+    setTimeout(renderMatchStack, 300);
+  } catch (e) {
+    toast('Ошибка: ' + e.message);
+    renderMatchStack();
+  } finally {
+    bar.querySelectorAll('button').forEach(b => b.disabled = false);
+  }
+}
+
+function closeDetails() {
+  const from = state.detailsFrom;
+  state.currentId = null;
+  state.detailsFrom = null;
+  if (from === 'match') goMatch();
+  else goList();
 }
 
 document.getElementById('back-btn').onclick = () => closeDetails();
+document.getElementById('match-btn').onclick = () => goMatch();
+document.getElementById('match-back-btn').onclick = () => goList();
 
 // SPA роутинг: реакция на back/forward браузера
-window.addEventListener('popstate', () => {
-  const m = location.pathname.match(/^\/vacancy\/(.+)$/);
+function routeFromLocation() {
+  const path = location.pathname;
+  const m = path.match(/^\/vacancy\/(.+)$/);
   if (m) {
-    openDetails(decodeURIComponent(m[1]), { push: false });
-  } else if (state.currentId) {
-    closeDetails({ push: false });
+    const from = new URLSearchParams(location.search).get('from') === 'match' ? 'match' : null;
+    goDetails(decodeURIComponent(m[1]), { push: false, from });
+  } else if (path === '/match') {
+    goMatch({ push: false });
+  } else {
+    goList({ push: false });
   }
-});
+}
+window.addEventListener('popstate', routeFromLocation);
 
 document.getElementById('tabs').addEventListener('click', e => {
   const btn = e.target.closest('.tab');
@@ -792,25 +1104,30 @@ document.getElementById('tabs').addEventListener('click', e => {
 // Telegram back button — синхронизируем видимость с состоянием
 function updateBackBtn() {
   if (!tg || !tg.BackButton) return;
-  if (state.currentId) tg.BackButton.show();
+  if (state.view === 'details' || state.view === 'match') tg.BackButton.show();
   else tg.BackButton.hide();
 }
 if (tg && tg.BackButton) {
   tg.BackButton.onClick(() => {
-    if (state.currentId) closeDetails();
+    if (state.view === 'details') closeDetails();
+    else if (state.view === 'match') goList();
     else tg.close();
   });
 }
 
-// Стартовая загрузка + deeplink: если URL /vacancy/<id> — открываем деталь
+// Стартовая загрузка + deeplink: /vacancy/<id>, /vacancy/<id>?from=match, /match
 loadCounts();
 loadList();
 setInterval(loadCounts, 30000);
 
 (function initialRoute() {
-  const m = location.pathname.match(/^\/vacancy\/(.+)$/);
+  const path = location.pathname;
+  const m = path.match(/^\/vacancy\/(.+)$/);
   if (m) {
-    openDetails(decodeURIComponent(m[1]), { push: false });
+    const from = new URLSearchParams(location.search).get('from') === 'match' ? 'match' : null;
+    goDetails(decodeURIComponent(m[1]), { push: false, from });
+  } else if (path === '/match') {
+    goMatch({ push: false });
   }
 })();
 </script>
