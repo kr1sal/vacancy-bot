@@ -793,7 +793,7 @@ function renderDetails(v) {
     <button class="btn secondary" id="open-btn">Открыть</button>
     <button class="btn ${v.applied ? 'secondary' : ''}" id="applied-btn">${appliedBtnLabel}</button>
     ${v.letter
-      ? '<button class="btn secondary" id="revise-btn">↻ Правки</button><button class="btn" id="copy-btn">Скопировать</button>'
+      ? '<button class="btn secondary" id="revise-btn">↻ Правки</button><button class="btn secondary" id="regen-btn">⟳ Заново</button><button class="btn" id="copy-btn">Скопировать</button>'
       : '<button class="btn" id="gen-btn">Письмо</button>'}
   `;
 
@@ -825,6 +825,27 @@ function renderDetails(v) {
       } catch (e) {
         genBtn.disabled = false;
         genBtn.textContent = 'Сгенерировать письмо';
+        toast('Ошибка: ' + e.message);
+      }
+    };
+  }
+
+  const regenBtn = document.getElementById('regen-btn');
+  if (regenBtn) {
+    regenBtn.onclick = async () => {
+      regenBtn.disabled = true;
+      regenBtn.innerHTML = '<span class="spinner"></span>Генерирую…';
+      try {
+        const { letter } = await api(`/api/vacancies/${v.id}/letter`, {
+          method: 'POST',
+          body: { force: true },
+        });
+        v.letter = letter;
+        renderDetails(v);
+        toast('Готово');
+      } catch (e) {
+        regenBtn.disabled = false;
+        regenBtn.textContent = '⟳ Заново';
         toast('Ошибка: ' + e.message);
       }
     };

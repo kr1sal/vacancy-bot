@@ -48,8 +48,13 @@ SENDERS = {
     # содержат «вакансии по подписке» — 20 нерелевантных позиций одной
     # компании ради одного совпадения по ключевому слову.
     "djinni.co": ("Djinni", r"https?://[^\s\"<>]*djinni\.co/jobs/\d+"),
+    # Только прямые ссылки на конкретную вакансию (числовой id после /jobs/view/).
+    # Текущий шаблон digest-писем LinkedIn шлёт в основном /comm/jobs/alerts
+    # (управление оповещениями) и /comm/jobs/search-results (страница поиска) —
+    # обе ведут в никуда конкретное, а заголовком становилась тема письма,
+    # из-за чего в ленте всплывали «вакансии», реально ведущие на общий поиск.
     "linkedin.com": ("LinkedIn",
-                     r"https?://[^\s\"<>]*linkedin\.com/(?:jobs/view|comm/jobs|jobs/collections)/[^\s\"<>]+"),
+                     r"https?://[^\s\"<>]*linkedin\.com/(?:jobs/view|comm/jobs/view)/\d+[^\s\"<>]*"),
     "indeed.com": ("Indeed",
                    r"https?://[^\s\"<>]*indeed\.com/(?:rc/clk|viewjob|jobs)[^\s\"<>]*jk=[a-zA-Z0-9]+"),
     "getmatch.ru": ("getmatch", r"https?://[^\s\"<>]*getmatch\.ru/vacancies/\d+"),

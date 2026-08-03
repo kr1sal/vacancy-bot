@@ -305,26 +305,28 @@ async def api_generate_letter(vid: str, request: Request):
         raise HTTPException(status_code=404, detail="not found")
 
     feedback = None
+    force = False
     try:
         body = await request.json()
         if isinstance(body, dict):
             feedback = (body.get("feedback") or "").strip() or None
+            force = bool(body.get("force"))
     except Exception:
         pass
 
     cached = db.get_letter(vid)
-    if cached and not feedback:
+    if cached and not feedback and not force:
         return {"letter": cached, "cached": True}
 
     try:
         letter = await asyncio.to_thread(
             ai.generate_cover_letter,
             v["title"], v["company"], v["description"] or "",
-            cached if feedback else None,
-            feedback,
+            cached if (feedback and not force) else None,
+            feedback if not force else None,
         )
         db.save_letter(vid, letter)
-        return {"letter": letter, "cached": False, "regenerated": bool(feedback)}
+        return {"letter": letter, "cached": False, "regenerated": bool(feedback), "forced": force}
     except Exception as e:
         logger.exception("Letter generation failed")
         return JSONResponse(status_code=500, content={"error": str(e)})
