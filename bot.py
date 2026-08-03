@@ -16,6 +16,8 @@ import ai
 from parsers import hh as hh_parser
 from parsers import habr as habr_parser
 from parsers import djinni as djinni_parser
+from parsers import surf as surf_parser
+from parsers import yandex as yandex_parser
 from parsers import telegram_user as tg_parser
 from parsers import gmail_imap as gmail_parser
 
@@ -138,6 +140,8 @@ async def check_vacancies(app: Application) -> None:
     tasks["hh"] = asyncio.create_task(_safe_fetch(hh_parser, "hh"))
     tasks["habr"] = asyncio.create_task(_safe_fetch(habr_parser, "habr"))
     tasks["djinni"] = asyncio.create_task(_safe_fetch(djinni_parser, "djinni"))
+    tasks["surf"] = asyncio.create_task(_safe_fetch(surf_parser, "surf"))
+    tasks["yandex"] = asyncio.create_task(_safe_fetch(yandex_parser, "yandex"))
     if tg_parser.is_enabled():
         tasks["tg"] = asyncio.create_task(_safe_fetch(tg_parser, "tg"))
     if gmail_parser.is_enabled():
