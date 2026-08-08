@@ -18,6 +18,11 @@ from parsers import habr as habr_parser
 from parsers import djinni as djinni_parser
 from parsers import surf as surf_parser
 from parsers import yandex as yandex_parser
+from parsers import friflex as friflex_parser
+from parsers import agima as agima_parser
+from parsers import wwr as wwr_parser
+from parsers import remoteok as remoteok_parser
+from parsers import relocateme as relocateme_parser
 from parsers import telegram_user as tg_parser
 from parsers import gmail_imap as gmail_parser
 
@@ -142,6 +147,11 @@ async def check_vacancies(app: Application) -> None:
     tasks["djinni"] = asyncio.create_task(_safe_fetch(djinni_parser, "djinni"))
     tasks["surf"] = asyncio.create_task(_safe_fetch(surf_parser, "surf"))
     tasks["yandex"] = asyncio.create_task(_safe_fetch(yandex_parser, "yandex"))
+    tasks["friflex"] = asyncio.create_task(_safe_fetch(friflex_parser, "friflex"))
+    tasks["agima"] = asyncio.create_task(_safe_fetch(agima_parser, "agima"))
+    tasks["wwr"] = asyncio.create_task(_safe_fetch(wwr_parser, "wwr"))
+    tasks["remoteok"] = asyncio.create_task(_safe_fetch(remoteok_parser, "remoteok"))
+    tasks["relocateme"] = asyncio.create_task(_safe_fetch(relocateme_parser, "relocateme"))
     if tg_parser.is_enabled():
         tasks["tg"] = asyncio.create_task(_safe_fetch(tg_parser, "tg"))
     if gmail_parser.is_enabled():
