@@ -16,7 +16,6 @@ services:
       - "127.0.0.1:8081:8080"
     volumes:
       - ./data:/app/data
-      - ../CV.md:/CV.md:ro
       - ../cover_letter_AMA.txt:/cover_letter_AMA.txt:ro
 
 networks:

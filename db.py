@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import uuid
 from config import DB_PATH
 
 
@@ -75,6 +76,19 @@ def mark_seen(vacancy_id: str, source: str, title: str, company: str,
                VALUES (?,?,?,?,?,?,?)""",
             (vacancy_id, source, title, company, url, salary, description),
         )
+
+
+def add_manual_vacancy(title: str, company: str, url: str, salary: str, description: str) -> str:
+    """Вакансия, добавленная владельцем вручную (найдена не через парсеры)."""
+    vacancy_id = f"manual_{uuid.uuid4().hex[:12]}"
+    with _conn() as conn:
+        conn.execute(
+            """INSERT INTO seen_vacancies
+               (id, source, title, company, url, salary, description)
+               VALUES (?,?,?,?,?,?,?)""",
+            (vacancy_id, "manual", title, company, url, salary, description),
+        )
+    return vacancy_id
 
 
 def list_vacancies(filter_type: str = "all") -> list[dict]:

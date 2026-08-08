@@ -12,7 +12,7 @@ import uvicorn
 
 from config import (
     BOT_TOKEN, TELEGRAM_USER_ID, WEBAPP_HOST, WEBAPP_PORT,
-    WEBAPP_LOCAL_TOKEN, BOT_USERNAME, SESSION_MAX_AGE_DAYS,
+    WEBAPP_LOCAL_TOKEN, BOT_USERNAME, SESSION_MAX_AGE_DAYS, CV_PATH,
 )
 import db
 import ai
@@ -190,6 +190,16 @@ async def match_page():
     return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
 
 
+@app.get("/resume")
+async def resume_page():
+    return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
+
+
+@app.get("/add")
+async def add_page():
+    return FileResponse(_INDEX_PATH, headers=_NO_CACHE)
+
+
 @app.get("/login")
 async def login_page():
     return FileResponse(_LOGIN_PATH, headers=_NO_CACHE)
@@ -330,6 +340,63 @@ async def api_generate_letter(vid: str, request: Request):
     except Exception as e:
         logger.exception("Letter generation failed")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/api/vacancies")
+async def api_add_vacancy(request: Request):
+    """Вакансия, которую владелец нашёл сам и добавляет вручную."""
+    _check_auth(request)
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="invalid body")
+
+    title = (body.get("title") or "").strip()
+    url = (body.get("url") or "").strip()
+    if not title or not url:
+        raise HTTPException(status_code=400, detail="title and url are required")
+
+    company = (body.get("company") or "").strip() or "Не указана"
+    salary = (body.get("salary") or "").strip() or "не указана"
+    description = (body.get("description") or "").strip()
+
+    vid = db.add_manual_vacancy(title, company, url, salary, description)
+
+    if description:
+        try:
+            summary = await asyncio.to_thread(ai.summarize_vacancy, title, company, description)
+            db.save_summary(vid, summary)
+        except Exception as e:
+            logger.error("Manual vacancy summary failed for %s: %s", vid, e)
+
+    return db.get_vacancy(vid)
+
+
+# ── Резюме (CV.md) — редактирование прямо в приложении ────────────────────────
+
+@app.get("/api/cv")
+async def api_get_cv(request: Request):
+    _check_auth(request)
+    try:
+        with open(CV_PATH, encoding="utf-8") as f:
+            content = f.read()
+    except FileNotFoundError:
+        content = ""
+    return {"content": content}
+
+
+@app.post("/api/cv")
+async def api_save_cv(request: Request):
+    _check_auth(request)
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="invalid body")
+    content = body.get("content")
+    if not isinstance(content, str):
+        raise HTTPException(status_code=400, detail="content is required")
+    os.makedirs(os.path.dirname(CV_PATH), exist_ok=True)
+    with open(CV_PATH, "w", encoding="utf-8") as f:
+        f.write(content)
+    return {"ok": True}
 
 
 # ── Config для клиента ────────────────────────────────────────────────────────

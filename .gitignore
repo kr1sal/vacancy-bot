@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+data/
 *.db
 *.db-shm
 *.db-wal

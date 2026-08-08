@@ -183,6 +183,7 @@
   .badge-tag.src-djinni { background: rgba(0, 122, 204, 0.15); color: #0075c4; }
   .badge-tag.src-tg { background: rgba(38, 129, 200, 0.15); color: #1a6ba8; }
   .badge-tag.src-gmail { background: rgba(217, 48, 37, 0.15); color: #c62b1f; }
+  .badge-tag.src-manual { background: rgba(76, 154, 42, 0.15); color: #3f7a1f; }
   .badge-tag.letter { background: rgba(245, 179, 1, 0.15); color: #b78400; }
   .badge-tag.applied { background: rgba(26, 143, 143, 0.18); color: var(--success); }
 
@@ -310,6 +311,36 @@
     line-height: 1.4;
   }
 
+  /* ── Резюме / форма ручного добавления вакансии ────────── */
+  .form-field { margin-bottom: 14px; }
+  .form-field label {
+    display: block;
+    font-size: 12px; font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 6px;
+  }
+  .form-field input,
+  .form-field textarea,
+  .resume-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.45;
+    outline: none;
+  }
+  .form-field input:focus,
+  .form-field textarea:focus,
+  .resume-textarea:focus { border-color: var(--accent); }
+  .form-field textarea { min-height: 110px; resize: vertical; }
+  .resume-textarea { min-height: 65vh; resize: vertical; background: var(--card); }
+
   .actions {
     position: fixed; bottom: 0; left: 0; right: 0;
     padding: 12px 14px calc(env(safe-area-inset-bottom, 0) + 12px);
@@ -431,6 +462,8 @@
       <div class="title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <span>Chert Vacancy Bot <span id="total-hint"></span></span>
         <span style="display:flex;gap:2px;">
+          <button class="theme-toggle" id="add-btn" title="Добавить вакансию">➕</button>
+          <button class="theme-toggle" id="resume-btn" title="Резюме">📄</button>
           <button class="theme-toggle" id="match-btn" title="Режим подбора">🔥<span class="match-badge" id="match-badge"></span></button>
           <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌓</button>
           <button class="theme-toggle" id="logout-btn" title="Выйти" style="display:none;">⎋</button>
@@ -473,6 +506,55 @@
     </div>
     <div class="details-body" id="details-body"></div>
     <div class="actions" id="details-actions"></div>
+  </div>
+
+  <!-- RESUME VIEW -->
+  <div class="details" id="resume-view">
+    <div class="details-header">
+      <button class="back-btn" id="resume-back-btn">← Назад</button>
+      <div style="font-weight:700;font-size:15px;">📄 Резюме</div>
+    </div>
+    <div class="details-body" id="resume-body">
+      <textarea class="resume-textarea" id="resume-textarea" placeholder="Текст резюме (Markdown)"></textarea>
+    </div>
+    <div class="actions" id="resume-actions">
+      <button class="btn secondary" id="resume-cancel-btn">Отмена</button>
+      <button class="btn" id="resume-save-btn">Сохранить</button>
+    </div>
+  </div>
+
+  <!-- ADD VACANCY VIEW -->
+  <div class="details" id="add-view">
+    <div class="details-header">
+      <button class="back-btn" id="add-back-btn">← Назад</button>
+      <div style="font-weight:700;font-size:15px;">➕ Новая вакансия</div>
+    </div>
+    <div class="details-body" id="add-body">
+      <div class="form-field">
+        <label for="add-title">Название *</label>
+        <input type="text" id="add-title" placeholder="Flutter Developer">
+      </div>
+      <div class="form-field">
+        <label for="add-company">Компания</label>
+        <input type="text" id="add-company" placeholder="Название компании">
+      </div>
+      <div class="form-field">
+        <label for="add-url">Ссылка на вакансию *</label>
+        <input type="text" id="add-url" placeholder="https://...">
+      </div>
+      <div class="form-field">
+        <label for="add-salary">Зарплата</label>
+        <input type="text" id="add-salary" placeholder="от 200 000 ₽">
+      </div>
+      <div class="form-field">
+        <label for="add-description">Описание</label>
+        <textarea id="add-description" placeholder="Текст описания вакансии — по нему сгенерируется выжимка и письмо"></textarea>
+      </div>
+    </div>
+    <div class="actions" id="add-actions">
+      <button class="btn secondary" id="add-cancel-btn">Отмена</button>
+      <button class="btn" id="add-submit-btn">Добавить</button>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -622,7 +704,7 @@ function renderList(vacancies) {
   });
 }
 
-const SOURCE_LABELS = { hh: 'HH', habr: 'HABR', djinni: 'DJINNI', tg: 'TG', gmail: 'GMAIL' };
+const SOURCE_LABELS = { hh: 'HH', habr: 'HABR', djinni: 'DJINNI', tg: 'TG', gmail: 'GMAIL', manual: 'СВОЯ' };
 
 function cardHtml(v) {
   const salary = v.salary && v.salary !== 'не указана' && v.salary !== 'не указан'
@@ -672,6 +754,8 @@ function showView(view) {
   document.getElementById('list-view').style.display = view === 'list' ? '' : 'none';
   document.getElementById('match-view').classList.toggle('active', view === 'match');
   document.getElementById('details-view').classList.toggle('active', view === 'details');
+  document.getElementById('resume-view').classList.toggle('active', view === 'resume');
+  document.getElementById('add-view').classList.toggle('active', view === 'add');
   state.view = view;
   updateBackBtn();
 }
@@ -692,6 +776,30 @@ function goMatch({ push = true } = {}) {
   showView('match');
   if (push) navigate('/match');
   loadMatchQueue();
+}
+
+async function goResume({ push = true } = {}) {
+  showView('resume');
+  if (push) navigate('/resume');
+  const textarea = document.getElementById('resume-textarea');
+  textarea.value = '';
+  textarea.disabled = true;
+  try {
+    const { content } = await api('/api/cv');
+    textarea.value = content;
+  } catch (e) {
+    toast('Ошибка загрузки резюме: ' + e.message);
+  } finally {
+    textarea.disabled = false;
+  }
+}
+
+function goAdd({ push = true } = {}) {
+  showView('add');
+  if (push) navigate('/add');
+  ['add-title', 'add-company', 'add-url', 'add-salary', 'add-description'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
 }
 
 async function goDetails(vid, { push = true, from = null } = {}) {
@@ -1103,6 +1211,56 @@ function closeDetails() {
 document.getElementById('back-btn').onclick = () => closeDetails();
 document.getElementById('match-btn').onclick = () => goMatch();
 document.getElementById('match-back-btn').onclick = () => goList();
+document.getElementById('resume-btn').onclick = () => goResume();
+document.getElementById('resume-back-btn').onclick = () => goList();
+document.getElementById('resume-cancel-btn').onclick = () => goList();
+document.getElementById('resume-save-btn').onclick = async () => {
+  const btn = document.getElementById('resume-save-btn');
+  const content = document.getElementById('resume-textarea').value;
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.innerHTML = '<span class="spinner"></span>Сохраняю…';
+  try {
+    await api('/api/cv', { method: 'POST', body: { content } });
+    toast('Резюме сохранено');
+  } catch (e) {
+    toast('Ошибка: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+};
+
+document.getElementById('add-btn').onclick = () => goAdd();
+document.getElementById('add-back-btn').onclick = () => goList();
+document.getElementById('add-cancel-btn').onclick = () => goList();
+document.getElementById('add-submit-btn').onclick = async () => {
+  const title = document.getElementById('add-title').value.trim();
+  const url = document.getElementById('add-url').value.trim();
+  if (!title || !url) { toast('Название и ссылка обязательны'); return; }
+  const body = {
+    title,
+    url,
+    company: document.getElementById('add-company').value.trim(),
+    salary: document.getElementById('add-salary').value.trim(),
+    description: document.getElementById('add-description').value.trim(),
+  };
+  const btn = document.getElementById('add-submit-btn');
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.innerHTML = '<span class="spinner"></span>Добавляю…';
+  try {
+    const v = await api('/api/vacancies', { method: 'POST', body });
+    toast('Вакансия добавлена');
+    loadCounts();
+    goDetails(v.id, { push: true });
+  } catch (e) {
+    toast('Ошибка: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+};
 
 // SPA роутинг: реакция на back/forward браузера
 function routeFromLocation() {
@@ -1113,6 +1271,10 @@ function routeFromLocation() {
     goDetails(decodeURIComponent(m[1]), { push: false, from });
   } else if (path === '/match') {
     goMatch({ push: false });
+  } else if (path === '/resume') {
+    goResume({ push: false });
+  } else if (path === '/add') {
+    goAdd({ push: false });
   } else {
     goList({ push: false });
   }
@@ -1131,13 +1293,13 @@ document.getElementById('tabs').addEventListener('click', e => {
 // Telegram back button — синхронизируем видимость с состоянием
 function updateBackBtn() {
   if (!tg || !tg.BackButton) return;
-  if (state.view === 'details' || state.view === 'match') tg.BackButton.show();
+  if (state.view !== 'list') tg.BackButton.show();
   else tg.BackButton.hide();
 }
 if (tg && tg.BackButton) {
   tg.BackButton.onClick(() => {
     if (state.view === 'details') closeDetails();
-    else if (state.view === 'match') goList();
+    else if (state.view === 'match' || state.view === 'resume' || state.view === 'add') goList();
     else tg.close();
   });
 }
@@ -1155,6 +1317,10 @@ setInterval(loadCounts, 30000);
     goDetails(decodeURIComponent(m[1]), { push: false, from });
   } else if (path === '/match') {
     goMatch({ push: false });
+  } else if (path === '/resume') {
+    goResume({ push: false });
+  } else if (path === '/add') {
+    goAdd({ push: false });
   }
 })();
 </script>
