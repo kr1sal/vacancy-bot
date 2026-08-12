@@ -67,6 +67,26 @@ def is_seen(vacancy_id: str) -> bool:
         return row is not None
 
 
+def is_content_duplicate(title: str, company: str, days: int = 30) -> bool:
+    """Ловит одну и ту же вакансию под разными внешними ID: репост той же
+    вакансии на исходном сайте (агентства пересоздают её ради даты) или
+    совпадение между источниками. Сравнение по точному title+company —
+    без фаззи-мэтчинга, чтобы не давать ложных срабатываний."""
+    title = (title or "").strip().lower()
+    company = (company or "").strip().lower()
+    if not title or not company:
+        return False
+    with _conn() as conn:
+        row = conn.execute(
+            """SELECT 1 FROM seen_vacancies
+               WHERE LOWER(TRIM(title)) = ? AND LOWER(TRIM(company)) = ?
+                 AND seen_at >= datetime('now', ?)
+               LIMIT 1""",
+            (title, company, f"-{days} days"),
+        ).fetchone()
+        return row is not None
+
+
 def mark_seen(vacancy_id: str, source: str, title: str, company: str,
               url: str, salary: str = "", description: str = "") -> None:
     with _conn() as conn:

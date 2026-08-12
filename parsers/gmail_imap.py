@@ -125,11 +125,30 @@ def _parse_message(msg: email.message.Message, source_name: str, url_pattern: st
     subject = _decode_header(msg.get("Subject", ""))
     body_html, body_text = _extract_body(msg)
 
-    urls = list(set(re.findall(url_pattern, body_html + " " + body_text)))
-    if not urls:
+    if not is_relevant(subject, body_text):
         return []
 
-    if not is_relevant(subject, body_text):
+    # LinkedIn job-alert дайджест — не одна вакансия, а основная + карточки
+    # «похожих вакансий», у каждой свой jobid, реальная компания и должность.
+    # Ставить всем тему письма (как для остальных отправителей) даёт кучу
+    # «дублей» с company="LinkedIn" и одинаковым title.
+    if source_name == "LinkedIn" and body_html:
+        result = _parse_linkedin_digest(body_html, body_text)
+        if result:
+            return result
+        # Карточки не распознались (LinkedIn поменял вёрстку) — не плодим
+        # дубли по всем найденным ссылкам, берём только первую.
+        urls = re.findall(url_pattern, body_html + " " + body_text)
+        if not urls:
+            return []
+        title = subject[:120] if subject else "Вакансия из Gmail"
+        return [Vacancy(
+            id=_make_id(source_name, urls[0]), title=title, company=source_name,
+            url=urls[0], salary="не указана", description=body_text[:3000],
+        )]
+
+    urls = list(set(re.findall(url_pattern, body_html + " " + body_text)))
+    if not urls:
         return []
 
     result = []
@@ -144,6 +163,52 @@ def _parse_message(msg: email.message.Message, source_name: str, url_pattern: st
             salary="не указана",
             description=body_text[:3000],
         ))
+    return result
+
+
+_LI_JOB_ID_RE = re.compile(r"linkedin\.com/(?:jobs/view|comm/jobs/view)/(\d+)")
+
+
+def _parse_linkedin_digest(body_html: str, body_text: str) -> list[Vacancy]:
+    """Вытаскивает реальные title/company для каждой карточки вакансии в письме.
+
+    У каждой ссылки .../jobs/view/<id> в ближайшей родительской <table> лежит
+    текст вида: "<Должность>\\n<Компания> · <Локация>\\n[доп. строка]" — так
+    LinkedIn верстает и основную вакансию письма, и карточки "похожих"."""
+    soup = BeautifulSoup(body_html, "lxml")
+    seen_ids: set[str] = set()
+    result: list[Vacancy] = []
+
+    for a in soup.find_all("a", href=True):
+        m = _LI_JOB_ID_RE.search(a["href"])
+        if not m:
+            continue
+        jid = m.group(1)
+        if jid in seen_ids:
+            continue
+        seen_ids.add(jid)
+
+        table = a.find_parent("table")
+        if not table:
+            continue
+        lines = [l.strip() for l in table.get_text("\n", strip=True).split("\n") if l.strip()]
+        if len(lines) < 2 or " · " not in lines[1]:
+            continue
+        title, company = lines[0], lines[1].split(" · ")[0].strip()
+        if not title or not company or title == company:
+            continue
+
+        result.append(Vacancy(
+            id=f"gmail_linkedin_{jid}",
+            title=title[:200],
+            company=company[:200],
+            url=a["href"],
+            salary="не указана",
+            description=body_text[:3000],
+        ))
+        if len(result) >= 10:
+            break
+
     return result
 
 

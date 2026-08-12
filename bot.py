@@ -167,8 +167,16 @@ async def check_vacancies(app: Application) -> None:
     _track_source_health(app, counts_by_source)
 
     new_count = 0
+    duplicate_count = 0
     for v in all_vacancies:
         if db.is_seen(v.id):
+            continue
+        if db.is_content_duplicate(v.title, v.company):
+            # тот же title+company уже прилетал под другим внешним ID
+            # (репост на сайте-источнике или совпадение между источниками) —
+            # не шлём повторно. Не пишем в БД, чтобы следующий цикл увидел
+            # свежий репост под тем же ID, если он опять сменится.
+            duplicate_count += 1
             continue
         db.mark_seen(v.id, v.source, v.title, v.company, v.url,
                      salary=v.salary, description=v.description)
@@ -189,7 +197,8 @@ async def check_vacancies(app: Application) -> None:
         await _send_queue.put((text, markup))
         new_count += 1
 
-    logger.info("Enqueued %d new vacancies (queue size: %d)", new_count, _send_queue.qsize())
+    logger.info("Enqueued %d new vacancies, %d content-duplicates skipped (queue size: %d)",
+                new_count, duplicate_count, _send_queue.qsize())
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
