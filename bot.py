@@ -23,6 +23,7 @@ from parsers import agima as agima_parser
 from parsers import wwr as wwr_parser
 from parsers import remoteok as remoteok_parser
 from parsers import relocateme as relocateme_parser
+from parsers import wellfound as wellfound_parser
 from parsers import telegram_user as tg_parser
 from parsers import gmail_imap as gmail_parser
 
@@ -152,6 +153,7 @@ async def check_vacancies(app: Application) -> None:
     tasks["wwr"] = asyncio.create_task(_safe_fetch(wwr_parser, "wwr"))
     tasks["remoteok"] = asyncio.create_task(_safe_fetch(remoteok_parser, "remoteok"))
     tasks["relocateme"] = asyncio.create_task(_safe_fetch(relocateme_parser, "relocateme"))
+    tasks["wellfound"] = asyncio.create_task(_safe_fetch(wellfound_parser, "wellfound"))
     if tg_parser.is_enabled():
         tasks["tg"] = asyncio.create_task(_safe_fetch(tg_parser, "tg"))
     if gmail_parser.is_enabled():
